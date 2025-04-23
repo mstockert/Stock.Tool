@@ -4,10 +4,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import MiniChart from "@/components/MiniChart";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useState } from "react";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue 
+} from "@/components/ui/select";
+
+type TimeframeOption = "1D" | "1W" | "1M" | "3M" | "1Y";
 
 export default function MarketOverview() {
+  const [timeframe, setTimeframe] = useState<TimeframeOption>("1D");
+  
   const { data: indices, isLoading, error } = useQuery<MarketIndex[]>({
-    queryKey: ["/api/market/indices"],
+    queryKey: ["/api/market/indices", timeframe],
   });
 
   const formatValue = (value: number) => {

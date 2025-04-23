@@ -499,6 +499,11 @@ export class StockApiService {
 
       const response = await axios.get(this.baseUrl, { params });
       const articles = response.data.feed || [];
+      
+      // If no articles are returned, throw an error to trigger the fallback
+      if (articles.length === 0) {
+        throw new Error("No news articles available from API");
+      }
 
       return articles.map((article: any) => ({
         id: article.id || String(Math.random()),
@@ -510,6 +515,8 @@ export class StockApiService {
       })).slice(0, 10); // Limit to 10 news items
     } catch (error) {
       console.error("Error fetching news:", error);
+      
+      // Enable fallback data for demo purposes
       
       // Fallback news if API fails
       const defaultNews: NewsItem[] = [

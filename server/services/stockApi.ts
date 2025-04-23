@@ -21,13 +21,9 @@ export class StockApiService {
   }
 
   // Fetch major market indices
-  async getMarketIndices(timeframe: string = "1D"): Promise<MarketIndex[]> {
-    // In a real app with a paid API, we would fetch real data
-    // For this demo, we'll create simulated market data with different 
-    // values based on the timeframe
-    
-    console.log(`⚡ getMarketIndices called with timeframe: ${timeframe}`);
-    
+  // Helper function to get timeframe-specific market data
+  // This is used by both getMarketIndices and getMarketIndexHistory
+  private getTimeframeSensitiveMarketData(timeframe: string): MarketIndex[] {
     // Base market data with very different values for easier debugging
     let baseIndices = [
       {
@@ -161,7 +157,18 @@ export class StockApiService {
     };
     
     // Get the right data set based on timeframe
-    const indices = baseIndices.map(index => getTimeframeData(index, timeframe));
+    return baseIndices.map(index => getTimeframeData(index, timeframe));
+  }
+
+  async getMarketIndices(timeframe: string = "1D"): Promise<MarketIndex[]> {
+    // In a real app with a paid API, we would fetch real data
+    // For this demo, we'll create simulated market data with different 
+    // values based on the timeframe
+    
+    console.log(`⚡ getMarketIndices called with timeframe: ${timeframe}`);
+    
+    // Get data for the requested timeframe
+    const indices = this.getTimeframeSensitiveMarketData(timeframe);
     
     // Log it for debugging
     console.log(`Generated market indices for timeframe ${timeframe}:`, 
@@ -480,46 +487,63 @@ export class StockApiService {
     const history: StockHistory[] = [];
     const now = new Date();
     
+    console.log(`Generating market index history for ${symbol} with timeframe ${timeframe}`);
+    
     // Set base parameters based on the market index
     let basePrice: number;
     let volatility: number;
     let trend: number;
     
-    switch (symbol) {
-      case "^GSPC": // S&P 500
-        basePrice = 4587.84;
-        volatility = 0.005;
-        trend = 0.002;
-        break;
-      case "^IXIC": // NASDAQ
-        basePrice = 14346.02;
-        volatility = 0.008;
-        trend = 0.003;
-        break;
-      case "^DJI": // DOW
-        basePrice = 36124.23;
-        volatility = 0.004;
-        trend = 0.001;
-        break;
-      case "^FTSE": // FTSE 100
-        basePrice = 7461.43;
-        volatility = 0.006;
-        trend = -0.001;
-        break;
-      case "^N225": // Nikkei
-        basePrice = 29332.16;
-        volatility = 0.007;
-        trend = 0.002;
-        break;
-      case "^GDAXI": // DAX
-        basePrice = 15727.67;
-        volatility = 0.006;
-        trend = -0.0005;
-        break;
-      default:
-        basePrice = 100;
-        volatility = 0.005;
-        trend = 0.001;
+    // Get base price from getMarketIndices for the given timeframe
+    // This ensures the price is consistent with what's shown in the market overview
+    let baseIndices = this.getTimeframeSensitiveMarketData(timeframe);
+    let indexData = baseIndices.find(idx => idx.symbol === symbol);
+    
+    if (indexData) {
+      basePrice = indexData.price;
+      // Trend should match the direction of changePercent
+      trend = indexData.changePercent >= 0 ? 0.002 : -0.002;
+      volatility = Math.abs(indexData.changePercent * 0.1) + 0.005;
+      
+      console.log(`Using timeframe-specific data for ${symbol}: price=${basePrice}, trend=${trend}, volatility=${volatility}`);
+    } else {
+      // Fallback if index not found
+      switch (symbol) {
+        case "^GSPC": // S&P 500
+          basePrice = 4587.84;
+          volatility = 0.005;
+          trend = 0.002;
+          break;
+        case "^IXIC": // NASDAQ
+          basePrice = 14346.02;
+          volatility = 0.008;
+          trend = 0.003;
+          break;
+        case "^DJI": // DOW
+          basePrice = 36124.23;
+          volatility = 0.004;
+          trend = 0.001;
+          break;
+        case "^FTSE": // FTSE 100
+          basePrice = 7461.43;
+          volatility = 0.006;
+          trend = -0.001;
+          break;
+        case "^N225": // Nikkei
+          basePrice = 29332.16;
+          volatility = 0.007;
+          trend = 0.002;
+          break;
+        case "^GDAXI": // DAX
+          basePrice = 15727.67;
+          volatility = 0.006;
+          trend = -0.0005;
+          break;
+        default:
+          basePrice = 100;
+          volatility = 0.005;
+          trend = 0.001;
+      }
     }
     
     // Adjust parameters based on timeframe to create visibly different charts

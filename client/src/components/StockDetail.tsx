@@ -15,9 +15,14 @@ type TimeframeOption = "1D" | "1W" | "1M" | "3M" | "1Y" | "5Y";
 type StockDetailProps = {
   symbol: string;
   initialTimeframe?: TimeframeOption;
+  onTimeframeChange?: (timeframe: TimeframeOption) => void;
 };
 
-export default function StockDetail({ symbol, initialTimeframe = "1D" }: StockDetailProps) {
+export default function StockDetail({ 
+  symbol, 
+  initialTimeframe = "1D",
+  onTimeframeChange
+}: StockDetailProps) {
   const [timeframe, setTimeframe] = useState<TimeframeOption>(initialTimeframe);
   
   // Update timeframe when initialTimeframe prop changes
@@ -87,6 +92,11 @@ export default function StockDetail({ symbol, initialTimeframe = "1D" }: StockDe
     });
     
     console.log(`Stock ${symbol} timeframe changed to ${newTimeframe} - refreshing data`);
+    
+    // Call the parent's callback if provided
+    if (onTimeframeChange) {
+      onTimeframeChange(newTimeframe);
+    }
   };
 
   const toggleFavorite = async () => {

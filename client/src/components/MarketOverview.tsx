@@ -29,7 +29,9 @@ export default function MarketOverview({ externalTimeframe }: MarketOverviewProp
   const { data: indices, isLoading, error } = useQuery<MarketIndex[]>({
     queryKey: ["/api/market/indices", timeframe],
     queryFn: async () => {
-      const response = await fetch(`/api/market/indices?timeframe=${timeframe}`);
+      // Add timestamp to avoid browser caching
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/market/indices?timeframe=${timeframe}&_t=${timestamp}`);
       if (!response.ok) {
         throw new Error('Failed to fetch market indices');
       }

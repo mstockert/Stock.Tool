@@ -170,6 +170,11 @@ export class StockApiService {
   // Get current stock quote
   async getStockQuote(symbol: string): Promise<StockQuote> {
     try {
+      // For market indices, use the market index data
+      if (symbol.startsWith('^')) {
+        return this.getMarketIndexQuote(symbol);
+      }
+      
       const params = {
         function: "GLOBAL_QUOTE",
         symbol,
@@ -199,6 +204,11 @@ export class StockApiService {
     } catch (error) {
       console.error(`Error fetching quote for ${symbol}:`, error);
       
+      // For market indices, use special data if API fails
+      if (symbol.startsWith('^')) {
+        return this.getMarketIndexQuote(symbol);
+      }
+      
       // Fallback data for AAPL if API fails
       if (symbol === "AAPL") {
         return {
@@ -219,10 +229,85 @@ export class StockApiService {
       throw error;
     }
   }
+  
+  // Generate quote data for market indices
+  private getMarketIndexQuote(symbol: string): StockQuote {
+    // First get the index from our market data function
+    const indices = this.getMarketIndices();
+    const index = indices.find(idx => idx.symbol === symbol);
+    
+    if (index) {
+      return {
+        symbol: index.symbol,
+        name: index.name,
+        price: index.price,
+        change: index.change,
+        changePercent: index.changePercent,
+        open: index.price - (index.change * 0.8),
+        high: index.price + (Math.abs(index.change) * 0.2),
+        low: index.price - (Math.abs(index.change) * 0.3),
+        close: index.price - index.change,
+        volume: Math.floor(Math.random() * 500000000) + 300000000,
+        marketCap: 0, // Not applicable for indices
+      };
+    }
+    
+    // Fallback data if the symbol is not found in our indices
+    switch (symbol) {
+      case "^GSPC": // S&P 500
+        return {
+          symbol: "^GSPC",
+          name: "S&P 500",
+          price: 4587.84,
+          change: 36.53,
+          changePercent: 0.008,
+          open: 4551.31,
+          high: 4590.24,
+          low: 4549.85,
+          close: 4551.31,
+          volume: 3800000000,
+          marketCap: 0,
+        };
+      case "^IXIC": // NASDAQ
+        return {
+          symbol: "^IXIC",
+          name: "NASDAQ Composite",
+          price: 14346.02,
+          change: 170.33,
+          changePercent: 0.012,
+          open: 14175.69,
+          high: 14352.45,
+          low: 14160.32,
+          close: 14175.69,
+          volume: 5200000000,
+          marketCap: 0,
+        };
+      default:
+        // Generic index data
+        return {
+          symbol: symbol,
+          name: "Market Index",
+          price: 1000.00,
+          change: 5.00,
+          changePercent: 0.005,
+          open: 995.00,
+          high: 1002.50,
+          low: 994.00,
+          close: 995.00,
+          volume: 1000000000,
+          marketCap: 0,
+        };
+    }
+  }
 
   // Get historical stock data for charts
   async getStockHistory(symbol: string, timeframe: string): Promise<StockHistory[]> {
     try {
+      // Check if this is a market index symbol (starts with ^)
+      if (symbol.startsWith('^')) {
+        return this.getMarketIndexHistory(symbol, timeframe);
+      }
+      
       let params: any = {
         symbol,
         apikey: this.apiKey,
@@ -316,6 +401,11 @@ export class StockApiService {
     } catch (error) {
       console.error(`Error fetching history for ${symbol}:`, error);
       
+      // If it's a market index, use the special method
+      if (symbol.startsWith('^')) {
+        return this.getMarketIndexHistory(symbol, timeframe);
+      }
+      
       // Generate some sample data if API fails
       const history: StockHistory[] = [];
       const now = new Date();
@@ -342,10 +432,166 @@ export class StockApiService {
       return history;
     }
   }
+  
+  // Generate simulated historical data for market indices with different patterns for each timeframe
+  private getMarketIndexHistory(symbol: string, timeframe: string): StockHistory[] {
+    const history: StockHistory[] = [];
+    const now = new Date();
+    
+    // Set base parameters based on the market index
+    let basePrice: number;
+    let volatility: number;
+    let trend: number;
+    
+    switch (symbol) {
+      case "^GSPC": // S&P 500
+        basePrice = 4587.84;
+        volatility = 0.005;
+        trend = 0.002;
+        break;
+      case "^IXIC": // NASDAQ
+        basePrice = 14346.02;
+        volatility = 0.008;
+        trend = 0.003;
+        break;
+      case "^DJI": // DOW
+        basePrice = 36124.23;
+        volatility = 0.004;
+        trend = 0.001;
+        break;
+      case "^FTSE": // FTSE 100
+        basePrice = 7461.43;
+        volatility = 0.006;
+        trend = -0.001;
+        break;
+      case "^N225": // Nikkei
+        basePrice = 29332.16;
+        volatility = 0.007;
+        trend = 0.002;
+        break;
+      case "^GDAXI": // DAX
+        basePrice = 15727.67;
+        volatility = 0.006;
+        trend = -0.0005;
+        break;
+      default:
+        basePrice = 100;
+        volatility = 0.005;
+        trend = 0.001;
+    }
+    
+    // Adjust parameters based on timeframe to create visibly different charts
+    let dataPoints: number;
+    let dateDelta: (date: Date, i: number) => Date;
+    
+    switch (timeframe) {
+      case "1D":
+        // Daily view - small changes
+        dataPoints = 24;
+        dateDelta = (date, i) => {
+          const newDate = new Date(date);
+          newDate.setHours(9 + Math.floor(i / 2));
+          newDate.setMinutes((i % 2) * 30);
+          return newDate;
+        };
+        break;
+      case "1W":
+        // Weekly view - moderate changes with more volatility
+        dataPoints = 30;
+        volatility *= 2;
+        trend *= 3;
+        dateDelta = (date, i) => {
+          const newDate = new Date(date);
+          newDate.setDate(date.getDate() - 7 + i);
+          return newDate;
+        };
+        break;
+      case "1M":
+        // Monthly view - larger changes, clear trend
+        dataPoints = 30;
+        volatility *= 3;
+        trend *= 5;
+        dateDelta = (date, i) => {
+          const newDate = new Date(date);
+          newDate.setDate(date.getDate() - 30 + i);
+          return newDate;
+        };
+        break;
+      case "3M":
+        // Quarterly view - significant changes
+        dataPoints = 45;
+        volatility *= 4;
+        trend *= 8;
+        dateDelta = (date, i) => {
+          const newDate = new Date(date);
+          newDate.setDate(date.getDate() - 90 + (i * 2));
+          return newDate;
+        };
+        break;
+      case "1Y":
+        // Yearly view - major changes
+        dataPoints = 52;
+        volatility *= 5;
+        trend *= 12;
+        dateDelta = (date, i) => {
+          const newDate = new Date(date);
+          newDate.setDate(date.getDate() - 365 + (i * 7));
+          return newDate;
+        };
+        break;
+      case "5Y":
+        // 5 Year view - dramatic changes
+        dataPoints = 60;
+        volatility *= 7;
+        trend *= 20;
+        dateDelta = (date, i) => {
+          const newDate = new Date(date);
+          newDate.setMonth(date.getMonth() - 60 + i);
+          return newDate;
+        };
+        break;
+      default:
+        dataPoints = 30;
+        dateDelta = (date, i) => {
+          const newDate = new Date(date);
+          newDate.setDate(date.getDate() - 30 + i);
+          return newDate;
+        };
+    }
+    
+    // Generate data with appropriate pattern for the timeframe
+    let currentPrice = basePrice * (1 - (trend * dataPoints / 2)); // Start below and trend up
+    
+    for (let i = 0; i < dataPoints; i++) {
+      const date = dateDelta(now, i);
+      
+      const dailyChange = (Math.random() - 0.5) * basePrice * volatility;
+      currentPrice = currentPrice + dailyChange + (basePrice * trend);
+      
+      history.push({
+        timestamp: date.toISOString().split('T')[0],
+        close: parseFloat(currentPrice.toFixed(2)),
+        high: parseFloat((currentPrice + (currentPrice * volatility * 0.5)).toFixed(2)),
+        low: parseFloat((currentPrice - (currentPrice * volatility * 0.5)).toFixed(2)),
+        open: parseFloat((currentPrice - dailyChange).toFixed(2)),
+        volume: Math.floor(Math.random() * 10000000) + 30000000,
+      });
+    }
+    
+    // Sort by date (oldest to newest)
+    return history.sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+  }
 
   // Get technical indicators for a stock
   async getTechnicalIndicators(symbol: string): Promise<TechnicalIndicator[]> {
     try {
+      // For market indices, generate special technical indicators
+      if (symbol.startsWith('^')) {
+        return this.getMarketIndexIndicators(symbol);
+      }
+      
       // Fetch SMA (Simple Moving Average)
       const sma50Response = await axios.get(this.baseUrl, {
         params: {
@@ -438,6 +684,11 @@ export class StockApiService {
     } catch (error) {
       console.error(`Error fetching technical indicators for ${symbol}:`, error);
       
+      // For market indices, use special method if API fails
+      if (symbol.startsWith('^')) {
+        return this.getMarketIndexIndicators(symbol);
+      }
+      
       // Provide fallback technical indicators if API fails
       return [
         {
@@ -463,10 +714,80 @@ export class StockApiService {
       ];
     }
   }
+  
+  // Generate simulated technical indicators for market indices
+  private getMarketIndexIndicators(symbol: string): TechnicalIndicator[] {
+    let basePrice: number;
+    let trend: number;
+    
+    switch (symbol) {
+      case "^GSPC": // S&P 500
+        basePrice = 4587.84;
+        trend = 0.002;
+        break;
+      case "^IXIC": // NASDAQ
+        basePrice = 14346.02;
+        trend = 0.003;
+        break;
+      case "^DJI": // DOW
+        basePrice = 36124.23;
+        trend = 0.001;
+        break;
+      case "^FTSE": // FTSE 100
+        basePrice = 7461.43;
+        trend = -0.001;
+        break;
+      case "^N225": // Nikkei
+        basePrice = 29332.16;
+        trend = 0.002;
+        break;
+      case "^GDAXI": // DAX
+        basePrice = 15727.67;
+        trend = -0.0005;
+        break;
+      default:
+        basePrice = 100;
+        trend = 0.001;
+    }
+    
+    // Determine signals based on trend
+    const ma50Value = basePrice * 0.97;
+    const ma200Value = basePrice * 0.92;
+    const rsiValue = trend > 0 ? 60 + (Math.random() * 10) : 40 - (Math.random() * 10);
+    const macdValue = trend > 0 ? 2.5 + (Math.random() * 1.5) : -1.5 - (Math.random() * 1.5);
+    
+    return [
+      {
+        name: "Moving Average (50)",
+        value: parseFloat(ma50Value.toFixed(2)),
+        signal: basePrice > ma50Value ? "Buy" : "Sell",
+      },
+      {
+        name: "Moving Average (200)",
+        value: parseFloat(ma200Value.toFixed(2)),
+        signal: basePrice > ma200Value ? "Buy" : "Sell",
+      },
+      {
+        name: "RSI (14)",
+        value: parseFloat(rsiValue.toFixed(2)),
+        signal: rsiValue < 30 ? "Buy" : rsiValue > 70 ? "Sell" : "Neutral",
+      },
+      {
+        name: "MACD",
+        value: parseFloat(macdValue.toFixed(2)),
+        signal: macdValue > 0 ? "Buy" : "Sell",
+      },
+    ];
+  }
 
   // Get company info and financials
   async getCompanyInfo(symbol: string): Promise<CompanyInfo> {
     try {
+      // For market indices, provide special market index information
+      if (symbol.startsWith('^')) {
+        return this.getMarketIndexInfo(symbol);
+      }
+      
       const response = await axios.get(this.baseUrl, {
         params: {
           function: "OVERVIEW",
@@ -504,6 +825,11 @@ export class StockApiService {
     } catch (error) {
       console.error(`Error fetching company info for ${symbol}:`, error);
       
+      // For market indices, use special info if API fails
+      if (symbol.startsWith('^')) {
+        return this.getMarketIndexInfo(symbol);
+      }
+      
       // Fallback company info for AAPL if API fails
       if (symbol === "AAPL") {
         return {
@@ -529,6 +855,165 @@ export class StockApiService {
       }
       
       throw error;
+    }
+  }
+  
+  // Generate company info for market indices
+  private getMarketIndexInfo(symbol: string): CompanyInfo {
+    switch (symbol) {
+      case "^GSPC":
+        return {
+          symbol: "^GSPC",
+          name: "S&P 500",
+          description: "The Standard and Poor's 500, or simply the S&P 500, is a stock market index tracking the stock performance of 500 large companies listed on exchanges in the United States. It is widely regarded as the best gauge of large-cap U.S. equities.",
+          industry: "Financial Services",
+          sector: "Index",
+          ceo: "N/A",
+          employees: 0,
+          founded: "1957-03-04",
+          headquarters: "New York, NY, USA",
+          website: "https://www.spglobal.com",
+          peRatio: 23.45,
+          eps: 195.64,
+          dividendYield: 1.38,
+          weekRange52: {
+            low: 4200.54,
+            high: 4850.32,
+          },
+          avgVolume: 3800000000,
+        };
+      
+      case "^IXIC":
+        return {
+          symbol: "^IXIC",
+          name: "NASDAQ Composite",
+          description: "The Nasdaq Composite is a stock market index that includes almost all stocks listed on the Nasdaq stock exchange. It is heavily weighted towards technology and growth companies, particularly those in the information technology sector.",
+          industry: "Financial Services",
+          sector: "Index",
+          ceo: "N/A",
+          employees: 0,
+          founded: "1971-02-05",
+          headquarters: "New York, NY, USA",
+          website: "https://www.nasdaq.com",
+          peRatio: 31.72,
+          eps: 452.27,
+          dividendYield: 0.82,
+          weekRange52: {
+            low: 12600.32,
+            high: 14790.41,
+          },
+          avgVolume: 5200000000,
+        };
+      
+      case "^DJI":
+        return {
+          symbol: "^DJI",
+          name: "Dow Jones Industrial Average",
+          description: "The Dow Jones Industrial Average (DJIA), or simply the Dow, is a stock market index of 30 prominent companies listed on stock exchanges in the United States. It is one of the oldest and most-watched indices in the world.",
+          industry: "Financial Services",
+          sector: "Index",
+          ceo: "N/A",
+          employees: 0,
+          founded: "1896-05-26",
+          headquarters: "New York, NY, USA",
+          website: "https://www.dowjones.com",
+          peRatio: 22.18,
+          eps: 1628.69,
+          dividendYield: 2.01,
+          weekRange52: {
+            low: 32800.45,
+            high: 37200.34,
+          },
+          avgVolume: 320000000,
+        };
+      
+      case "^FTSE":
+        return {
+          symbol: "^FTSE",
+          name: "FTSE 100 Index",
+          description: "The FTSE 100 Index, also known as the Financial Times Stock Exchange 100 Index, is a share index of the 100 companies listed on the London Stock Exchange with the highest market capitalization.",
+          industry: "Financial Services",
+          sector: "Index",
+          ceo: "N/A",
+          employees: 0,
+          founded: "1984-01-03",
+          headquarters: "London, UK",
+          website: "https://www.ftse.com",
+          peRatio: 14.35,
+          eps: 520.66,
+          dividendYield: 3.45,
+          weekRange52: {
+            low: 7100.65,
+            high: 7900.32,
+          },
+          avgVolume: 890000000,
+        };
+        
+      case "^N225":
+        return {
+          symbol: "^N225",
+          name: "Nikkei 225",
+          description: "The Nikkei 225, more commonly called the Nikkei, is a stock market index for the Tokyo Stock Exchange. It is the most widely quoted average of Japanese equities, representing a broad cross-section of Japanese industry.",
+          industry: "Financial Services",
+          sector: "Index",
+          ceo: "N/A",
+          employees: 0,
+          founded: "1950-09-07",
+          headquarters: "Tokyo, Japan",
+          website: "https://www.nikkei.com",
+          peRatio: 17.62,
+          eps: 1664.71,
+          dividendYield: 1.76,
+          weekRange52: {
+            low: 27500.34,
+            high: 31200.56,
+          },
+          avgVolume: 720000000,
+        };
+        
+      case "^GDAXI":
+        return {
+          symbol: "^GDAXI",
+          name: "DAX Performance Index",
+          description: "The DAX (Deutscher Aktienindex) is a blue chip stock market index consisting of the 30 major German companies trading on the Frankfurt Stock Exchange. It is the equivalent of the FT 30 and the Dow Jones Industrial Average.",
+          industry: "Financial Services",
+          sector: "Index",
+          ceo: "N/A",
+          employees: 0,
+          founded: "1988-07-01",
+          headquarters: "Frankfurt, Germany",
+          website: "https://www.deutsche-boerse.com",
+          peRatio: 16.25,
+          eps: 968.47,
+          dividendYield: 2.83,
+          weekRange52: {
+            low: 14800.43,
+            high: 16400.67,
+          },
+          avgVolume: 680000000,
+        };
+        
+      default:
+        return {
+          symbol: symbol,
+          name: "Market Index",
+          description: "A stock market index is a measurement of a section of the stock market, calculated from the prices of selected stocks.",
+          industry: "Financial Services",
+          sector: "Index",
+          ceo: "N/A",
+          employees: 0,
+          founded: "N/A",
+          headquarters: "N/A",
+          website: "N/A",
+          peRatio: 0,
+          eps: 0,
+          dividendYield: 0,
+          weekRange52: {
+            low: 0,
+            high: 0,
+          },
+          avgVolume: 0,
+        };
     }
   }
 

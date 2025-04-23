@@ -38,7 +38,9 @@ export default function StockDetail({ symbol, initialTimeframe = "1D" }: StockDe
   const { data: history, isLoading: historyLoading } = useQuery<StockHistory[]>({
     queryKey: [`/api/stocks/history/${symbol}`, timeframe],
     queryFn: async () => {
-      const response = await fetch(`/api/stocks/history/${symbol}?timeframe=${timeframe}`);
+      // Add timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/stocks/history/${symbol}?timeframe=${timeframe}&_t=${timestamp}`);
       if (!response.ok) {
         throw new Error('Failed to fetch stock history');
       }

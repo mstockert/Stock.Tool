@@ -206,12 +206,12 @@ export default function WatchlistPage() {
           className="space-y-4"
         >
           <div className="flex justify-between items-center">
-            <TabsList className="bg-dark-surface-2">
+            <TabsList className="bg-gray-200 dark:bg-dark-surface-2">
               {watchlists.map((list) => (
                 <TabsTrigger
                   key={list.id}
                   value={list.id.toString()}
-                  className="text-black dark:text-text-primary data-[state=active]:bg-primary data-[state=active]:text-white"
+                  className="!text-black !dark:text-white data-[state=active]:bg-primary data-[state=active]:!text-white"
                 >
                   {list.name}
                 </TabsTrigger>

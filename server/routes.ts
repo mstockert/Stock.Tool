@@ -13,6 +13,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Support timeframe parameter
       const timeframe = req.query.timeframe as string || "1D";
+      
+      // Disable caching to ensure fresh data for each timeframe
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
       const indices = await stockApi.getMarketIndices(timeframe);
       res.json(indices);
     } catch (error) {
@@ -55,6 +61,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const symbol = req.params.symbol;
       const timeframe = req.query.timeframe as string || "1D";
+      
+      // Disable caching to ensure fresh data for each timeframe
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
       const history = await stockApi.getStockHistory(symbol, timeframe);
       res.json(history);
     } catch (error) {

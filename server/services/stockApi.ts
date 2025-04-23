@@ -94,28 +94,32 @@ export class StockApiService {
           // Keep the default values
           break;
         case "1W":
-          // Simulate weekly data
-          result.change = result.change * 1.5;
-          result.changePercent = result.changePercent * 1.5;
-          result.sparkline = result.sparkline.map(v => v * (1 + (Math.random() * 0.01)));
-          break;
-        case "1M":
-          // Simulate monthly data
+          // Simulate weekly data - significant difference from daily
           result.change = result.change * 2.5;
           result.changePercent = result.changePercent * 2.5;
-          result.sparkline = result.sparkline.map(v => v * (1 + (Math.random() * 0.03)));
+          result.price = result.price * 1.02;
+          result.sparkline = [result.price * 0.97, result.price * 0.98, result.price * 0.99, result.price * 1.00, result.price * 1.01, result.price];
           break;
-        case "3M":
-          // Simulate quarterly data
-          result.change = result.change * 3.0;
-          result.changePercent = result.changePercent * 3.0;
-          result.sparkline = result.sparkline.map(v => v * (1 + (Math.random() * 0.05)));
-          break;
-        case "1Y":
-          // Simulate yearly data
+        case "1M":
+          // Simulate monthly data - very different values
           result.change = result.change * 4.0;
           result.changePercent = result.changePercent * 4.0;
-          result.sparkline = result.sparkline.map(v => v * (1 + (Math.random() * 0.1)));
+          result.price = result.price * 1.05;
+          result.sparkline = [result.price * 0.94, result.price * 0.96, result.price * 0.98, result.price * 1.01, result.price * 1.03, result.price];
+          break;
+        case "3M":
+          // Simulate quarterly data - dramatic changes
+          result.change = result.change * 6.0;
+          result.changePercent = result.changePercent * 6.0;
+          result.price = result.price * 1.08;
+          result.sparkline = [result.price * 0.90, result.price * 0.93, result.price * 0.97, result.price * 1.02, result.price * 1.05, result.price];
+          break;
+        case "1Y":
+          // Simulate yearly data - major growth
+          result.change = result.change * 10.0;
+          result.changePercent = result.changePercent * 10.0;
+          result.price = result.price * 1.15;
+          result.sparkline = [result.price * 0.85, result.price * 0.90, result.price * 0.95, result.price * 1.05, result.price * 1.10, result.price];
           break;
       }
       

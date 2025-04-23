@@ -60,7 +60,8 @@ export default function StockDetail({ symbol, initialTimeframe = "1D" }: StockDe
   const handleTimeframeChange = (newTimeframe: TimeframeOption) => {
     setTimeframe(newTimeframe);
     // Force refetch when timeframe changes
-    queryClient.invalidateQueries({ queryKey: [`/api/stocks/history/${symbol}`, timeframe] });
+    // Use only the base endpoint for invalidation to ensure it works with any timeframe
+    queryClient.invalidateQueries({ queryKey: [`/api/stocks/history/${symbol}`] });
   };
 
   const toggleFavorite = async () => {

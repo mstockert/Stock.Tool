@@ -21,10 +21,13 @@ export class StockApiService {
   }
 
   // Fetch major market indices
-  async getMarketIndices(): Promise<MarketIndex[]> {
+  async getMarketIndices(timeframe: string = "1D"): Promise<MarketIndex[]> {
     // In a real app with a paid API, we would fetch real data
-    // For this demo, we'll create simulated market data
-    const indices: MarketIndex[] = [
+    // For this demo, we'll create simulated market data with different 
+    // values based on the timeframe
+    
+    // Base market data
+    let baseIndices = [
       {
         symbol: "^GSPC",
         name: "S&P 500",
@@ -80,6 +83,44 @@ export class StockApiService {
         sparkline: [15750, 15745, 15740, 15735, 15730, 15728],
       },
     ];
+    
+    // Modify the data based on timeframe
+    // This simulates how indices would look over different time periods
+    const indices = baseIndices.map(index => {
+      const result = { ...index };
+      
+      switch (timeframe) {
+        case "1D":
+          // Keep the default values
+          break;
+        case "1W":
+          // Simulate weekly data
+          result.change = result.change * 1.5;
+          result.changePercent = result.changePercent * 1.5;
+          result.sparkline = result.sparkline.map(v => v * (1 + (Math.random() * 0.01)));
+          break;
+        case "1M":
+          // Simulate monthly data
+          result.change = result.change * 2.5;
+          result.changePercent = result.changePercent * 2.5;
+          result.sparkline = result.sparkline.map(v => v * (1 + (Math.random() * 0.03)));
+          break;
+        case "3M":
+          // Simulate quarterly data
+          result.change = result.change * 3.0;
+          result.changePercent = result.changePercent * 3.0;
+          result.sparkline = result.sparkline.map(v => v * (1 + (Math.random() * 0.05)));
+          break;
+        case "1Y":
+          // Simulate yearly data
+          result.change = result.change * 4.0;
+          result.changePercent = result.changePercent * 4.0;
+          result.sparkline = result.sparkline.map(v => v * (1 + (Math.random() * 0.1)));
+          break;
+      }
+      
+      return result;
+    });
 
     return indices;
   }

@@ -582,11 +582,18 @@ export class StockApiService {
         
         console.log(`Generating 1D data with ${dataPoints} points (${tradingHoursPassed} hours of trading)`);
         
+        // Use TODAY's date (not 'date' parameter which might be yesterday)
+        // This ensures intraday data is for today and not yesterday
+        const today = new Date();
+        
         dateDelta = (date, i) => {
-          const newDate = new Date(date);
-          // Adjust to show data starting from market open
+          // Start with today's date
+          const newDate = new Date(today);
+          // Set date to today but with specific time
           newDate.setHours(marketOpen + Math.floor(i / 2));
           newDate.setMinutes((i % 2) * 30);
+          newDate.setSeconds(0);
+          newDate.setMilliseconds(0);
           return newDate;
         };
         break;

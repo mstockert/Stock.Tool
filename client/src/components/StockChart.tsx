@@ -26,7 +26,10 @@ const StockChart = ({ data, timeframe, isPositive }: StockChartProps) => {
 
   // Format date for x-axis based on timeframe
   const formatDate = (timestamp: string) => {
-    const date = new Date(timestamp);
+    // Handle different timestamp formats (ISO date vs datetime string)
+    const date = timestamp.includes(' ') 
+      ? new Date(timestamp.replace(' ', 'T'))  // Handle intraday format: "2025-04-23 14:30:00"
+      : new Date(timestamp);                    // Handle regular format: "2025-04-23"
     
     switch (timeframe) {
       case "1D":
@@ -46,10 +49,15 @@ const StockChart = ({ data, timeframe, isPositive }: StockChartProps) => {
 
   // Format tooltip date
   const formatTooltipDate = (timestamp: string) => {
-    const date = new Date(timestamp);
+    // Handle different timestamp formats (ISO date vs datetime string)
+    const date = timestamp.includes(' ') 
+      ? new Date(timestamp.replace(' ', 'T'))  // Handle intraday format: "2025-04-23 14:30:00"
+      : new Date(timestamp);                    // Handle regular format: "2025-04-23"
     
     if (timeframe === "1D") {
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${
+        date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      }`;
     }
     
     return date.toLocaleDateString([], {

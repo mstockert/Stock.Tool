@@ -552,11 +552,40 @@ export class StockApiService {
     
     switch (timeframe) {
       case "1D":
-        // Daily view - small changes
-        dataPoints = 24;
+        // Get current hour in ET to determine how much of the trading day to show
+        // Trading hours typically 9:30 AM - 4:00 PM ET
+        const currentHourET = new Date().getHours();
+        
+        // For demonstration, let's limit to actual market hours
+        // In a real app, we'd check if market is open and use the actual current time
+        const marketOpen = 9; // 9:30 AM ET
+        const marketClose = 16; // 4:00 PM ET
+        
+        // Calculate how many hours of trading day have passed
+        let tradingHoursPassed = Math.min(currentHourET - marketOpen, marketClose - marketOpen);
+        
+        // If after market hours, show full day
+        if (currentHourET >= marketClose) {
+          tradingHoursPassed = marketClose - marketOpen;
+        }
+        
+        // If before market hours, show a small amount of pre-market
+        if (currentHourET < marketOpen) {
+          tradingHoursPassed = 2; // Show 2 hours of pre-market
+        }
+        
+        // Ensure at least some data points
+        tradingHoursPassed = Math.max(tradingHoursPassed, 2);
+        
+        // Create appropriate number of data points (2 per hour = 30min intervals)
+        dataPoints = tradingHoursPassed * 2;
+        
+        console.log(`Generating 1D data with ${dataPoints} points (${tradingHoursPassed} hours of trading)`);
+        
         dateDelta = (date, i) => {
           const newDate = new Date(date);
-          newDate.setHours(9 + Math.floor(i / 2));
+          // Adjust to show data starting from market open
+          newDate.setHours(marketOpen + Math.floor(i / 2));
           newDate.setMinutes((i % 2) * 30);
           return newDate;
         };
@@ -634,8 +663,13 @@ export class StockApiService {
       const dailyChange = (Math.random() - 0.5) * basePrice * volatility;
       currentPrice = currentPrice + dailyChange + (basePrice * trend);
       
+      // For 1D view, include time in timestamp
+      const timestamp = timeframe === "1D" 
+        ? date.toISOString().replace('T', ' ').substring(0, 19) // Include time
+        : date.toISOString().split('T')[0]; // Just date for other timeframes
+      
       history.push({
-        timestamp: date.toISOString().split('T')[0],
+        timestamp,
         close: parseFloat(currentPrice.toFixed(2)),
         high: parseFloat((currentPrice + (currentPrice * volatility * 0.5)).toFixed(2)),
         low: parseFloat((currentPrice - (currentPrice * volatility * 0.5)).toFixed(2)),

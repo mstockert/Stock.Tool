@@ -11,27 +11,28 @@ type SidebarLinkProps = {
   href: string;
   active?: boolean;
   badge?: string | number;
+  onClick?: () => void;
 };
 
-const SidebarLink = ({ icon, label, href, active, badge }: SidebarLinkProps) => {
+const SidebarLink = ({ icon, label, href, active, badge, onClick }: SidebarLinkProps) => {
   return (
-    <Link href={href}>
-      <a
-        className={cn(
-          "flex items-center px-4 py-2.5 text-text-primary hover:bg-dark-surface-2",
-          active && "text-primary bg-dark-surface-2 border-l-2 border-primary"
-        )}
-      >
-        <div className="flex items-center flex-1">
-          <span className="mr-3">{icon}</span>
-          <span>{label}</span>
-        </div>
-        {badge && (
-          <span className="text-xs rounded-full bg-primary bg-opacity-20 text-primary px-2 py-0.5">
-            {badge}
-          </span>
-        )}
-      </a>
+    <Link 
+      href={href}
+      onClick={onClick}
+      className={cn(
+        "flex items-center px-4 py-2.5 text-text-primary hover:bg-dark-surface-2",
+        active && "text-primary bg-dark-surface-2 border-l-2 border-primary"
+      )}
+    >
+      <div className="flex items-center flex-1">
+        <span className="mr-3">{icon}</span>
+        <span>{label}</span>
+      </div>
+      {badge && (
+        <span className="text-xs rounded-full bg-primary bg-opacity-20 text-primary px-2 py-0.5">
+          {badge}
+        </span>
+      )}
     </Link>
   );
 };
@@ -64,11 +65,9 @@ const MainLayout = ({ children }: MainLayoutProps) => {
             <button onClick={toggleSidebar} className="md:hidden mr-2 text-text-primary">
               <MenuIcon className="h-5 w-5" />
             </button>
-            <Link href="/">
-              <a className="flex items-center">
+            <Link href="/" className="flex items-center">
                 <LineChart className="text-primary h-6 w-6 mr-2" />
                 <span className="text-xl font-semibold">Stock.Tool</span>
-              </a>
             </Link>
           </div>
 

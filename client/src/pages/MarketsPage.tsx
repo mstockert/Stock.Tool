@@ -16,7 +16,20 @@ export default function MarketsPage() {
               <CardTitle>Market Indices</CardTitle>
             </CardHeader>
             <CardContent className="p-4">
-              <MarketOverview />
+              {/* Override the default grid in MarketOverview with a more responsive grid */}
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-medium">Major Indices</h2>
+                  <div className="text-sm text-text-secondary">
+                    <span>Last updated: </span>
+                    <span>{new Date().toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <MarketOverview />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

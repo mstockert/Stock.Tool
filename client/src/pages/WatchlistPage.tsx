@@ -257,10 +257,8 @@ export default function WatchlistPage() {
                       {list.symbols.map((symbol) => (
                         <div key={symbol.id} className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-dark-surface-2">
                           <div className="col-span-3">
-                            <Link href={`/stock/${symbol.symbol}`}>
-                              <a className="font-medium text-primary hover:underline">
-                                {symbol.symbol}
-                              </a>
+                            <Link href={`/stock/${symbol.symbol}`} className="font-medium text-primary hover:underline">
+                              {symbol.symbol}
                             </Link>
                           </div>
                           <div className="col-span-5">{symbol.companyName}</div>

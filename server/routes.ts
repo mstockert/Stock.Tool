@@ -11,7 +11,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Market data routes
   app.get("/api/market/indices", async (req, res) => {
     try {
-      const indices = await stockApi.getMarketIndices();
+      // Support timeframe parameter
+      const timeframe = req.query.timeframe as string || "1D";
+      const indices = await stockApi.getMarketIndices(timeframe);
       res.json(indices);
     } catch (error) {
       console.error("Error fetching market indices:", error);

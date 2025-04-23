@@ -22,8 +22,12 @@ export default function StockDetail({ symbol, initialTimeframe = "1D" }: StockDe
   
   // Update timeframe when initialTimeframe prop changes
   useEffect(() => {
-    setTimeframe(initialTimeframe);
-  }, [initialTimeframe]);
+    if (timeframe !== initialTimeframe) {
+      setTimeframe(initialTimeframe);
+      // Force refetch when timeframe changes from parent
+      queryClient.invalidateQueries({ queryKey: [`/api/stocks/history/${symbol}`] });
+    }
+  }, [initialTimeframe, symbol, timeframe, queryClient]);
   const [isFavorite, setIsFavorite] = useState(false);
   const { toast } = useToast();
 
@@ -55,6 +59,8 @@ export default function StockDetail({ symbol, initialTimeframe = "1D" }: StockDe
 
   const handleTimeframeChange = (newTimeframe: TimeframeOption) => {
     setTimeframe(newTimeframe);
+    // Force refetch when timeframe changes
+    queryClient.invalidateQueries({ queryKey: [`/api/stocks/history/${symbol}`, timeframe] });
   };
 
   const toggleFavorite = async () => {

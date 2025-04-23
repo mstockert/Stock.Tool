@@ -160,16 +160,16 @@ export default function WatchlistPage() {
               New Watchlist
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-dark-surface text-text-primary">
+          <DialogContent className="bg-white dark:bg-dark-surface text-black dark:text-text-primary">
             <DialogHeader>
-              <DialogTitle>Create New Watchlist</DialogTitle>
+              <DialogTitle className="text-black dark:text-white">Create New Watchlist</DialogTitle>
             </DialogHeader>
             <div className="py-4">
               <Input
                 placeholder="Watchlist name"
                 value={newWatchlistName}
                 onChange={(e) => setNewWatchlistName(e.target.value)}
-                className="bg-dark-surface-2"
+                className="bg-gray-100 dark:bg-dark-surface-2"
               />
             </div>
             <DialogFooter>
@@ -225,16 +225,16 @@ export default function WatchlistPage() {
                   Add Symbol
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-dark-surface text-text-primary">
+              <DialogContent className="bg-white dark:bg-dark-surface text-black dark:text-text-primary">
                 <DialogHeader>
-                  <DialogTitle>Add Symbol to Watchlist</DialogTitle>
+                  <DialogTitle className="text-black dark:text-white">Add Symbol to Watchlist</DialogTitle>
                 </DialogHeader>
                 <div className="py-4">
                   <Input
                     placeholder="Enter stock symbol (e.g. AAPL)"
                     value={newSymbol}
                     onChange={(e) => setNewSymbol(e.target.value)}
-                    className="bg-dark-surface-2"
+                    className="bg-gray-100 dark:bg-dark-surface-2"
                   />
                 </div>
                 <DialogFooter>

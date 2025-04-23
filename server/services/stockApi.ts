@@ -26,7 +26,9 @@ export class StockApiService {
     // For this demo, we'll create simulated market data with different 
     // values based on the timeframe
     
-    // Base market data
+    console.log(`⚡ getMarketIndices called with timeframe: ${timeframe}`);
+    
+    // Base market data with very different values for easier debugging
     let baseIndices = [
       {
         symbol: "^GSPC",
@@ -84,47 +86,87 @@ export class StockApiService {
       },
     ];
     
-    // Modify the data based on timeframe
-    // This simulates how indices would look over different time periods
-    const indices = baseIndices.map(index => {
-      const result = { ...index };
-      
+    // Create completely different data sets for each timeframe
+    // This ensures we can clearly see the timeframe changes working
+    const getTimeframeData = (index: any, timeframe: string) => {
       switch (timeframe) {
         case "1D":
-          // Keep the default values
-          break;
+          return {
+            ...index,
+            // No changes for "1D" timeframe
+          };
         case "1W":
-          // Simulate weekly data - significant difference from daily
-          result.change = result.change * 2.5;
-          result.changePercent = result.changePercent * 2.5;
-          result.price = result.price * 1.02;
-          result.sparkline = [result.price * 0.97, result.price * 0.98, result.price * 0.99, result.price * 1.00, result.price * 1.01, result.price];
-          break;
+          return {
+            ...index,
+            price: parseFloat((index.price * 1.05).toFixed(2)),
+            change: parseFloat((index.change * 5).toFixed(2)),
+            changePercent: parseFloat((index.changePercent * 5).toFixed(1)),
+            sparkline: [
+              index.price * 0.97, 
+              index.price * 0.98, 
+              index.price * 0.99, 
+              index.price * 1.02, 
+              index.price * 1.04, 
+              index.price * 1.05
+            ],
+          };
         case "1M":
-          // Simulate monthly data - very different values
-          result.change = result.change * 4.0;
-          result.changePercent = result.changePercent * 4.0;
-          result.price = result.price * 1.05;
-          result.sparkline = [result.price * 0.94, result.price * 0.96, result.price * 0.98, result.price * 1.01, result.price * 1.03, result.price];
-          break;
+          return {
+            ...index,
+            price: parseFloat((index.price * 1.10).toFixed(2)),
+            change: parseFloat((index.change * 8).toFixed(2)),
+            changePercent: parseFloat((index.changePercent * 8).toFixed(1)),
+            sparkline: [
+              index.price * 0.94, 
+              index.price * 0.97, 
+              index.price * 1.01, 
+              index.price * 1.05, 
+              index.price * 1.08, 
+              index.price * 1.10
+            ],
+          };
         case "3M":
-          // Simulate quarterly data - dramatic changes
-          result.change = result.change * 6.0;
-          result.changePercent = result.changePercent * 6.0;
-          result.price = result.price * 1.08;
-          result.sparkline = [result.price * 0.90, result.price * 0.93, result.price * 0.97, result.price * 1.02, result.price * 1.05, result.price];
-          break;
+          return {
+            ...index,
+            price: parseFloat((index.price * 1.15).toFixed(2)),
+            change: parseFloat((index.change * 12).toFixed(2)),
+            changePercent: parseFloat((index.changePercent * 12).toFixed(1)),
+            sparkline: [
+              index.price * 0.90, 
+              index.price * 0.95, 
+              index.price * 1.02, 
+              index.price * 1.08, 
+              index.price * 1.12, 
+              index.price * 1.15
+            ],
+          };
         case "1Y":
-          // Simulate yearly data - major growth
-          result.change = result.change * 10.0;
-          result.changePercent = result.changePercent * 10.0;
-          result.price = result.price * 1.15;
-          result.sparkline = [result.price * 0.85, result.price * 0.90, result.price * 0.95, result.price * 1.05, result.price * 1.10, result.price];
-          break;
+          return {
+            ...index,
+            price: parseFloat((index.price * 1.25).toFixed(2)),
+            change: parseFloat((index.change * 20).toFixed(2)),
+            changePercent: parseFloat((index.changePercent * 20).toFixed(1)),
+            sparkline: [
+              index.price * 0.85, 
+              index.price * 0.95, 
+              index.price * 1.05, 
+              index.price * 1.15, 
+              index.price * 1.20, 
+              index.price * 1.25
+            ],
+          };
+        default:
+          return index;
       }
-      
-      return result;
-    });
+    };
+    
+    // Get the right data set based on timeframe
+    const indices = baseIndices.map(index => getTimeframeData(index, timeframe));
+    
+    // Log it for debugging
+    console.log(`Generated market indices for timeframe ${timeframe}:`, 
+      indices.map(idx => `${idx.name}: ${idx.price.toFixed(2)} (${(idx.changePercent * 100).toFixed(1)}%)`).join(', ')
+    );
 
     return indices;
   }
@@ -172,7 +214,7 @@ export class StockApiService {
     try {
       // For market indices, use the market index data
       if (symbol.startsWith('^')) {
-        return this.getMarketIndexQuote(symbol);
+        return await this.getMarketIndexQuote(symbol);
       }
       
       const params = {
@@ -206,7 +248,7 @@ export class StockApiService {
       
       // For market indices, use special data if API fails
       if (symbol.startsWith('^')) {
-        return this.getMarketIndexQuote(symbol);
+        return await this.getMarketIndexQuote(symbol);
       }
       
       // Fallback data for AAPL if API fails
@@ -231,10 +273,10 @@ export class StockApiService {
   }
   
   // Generate quote data for market indices
-  private getMarketIndexQuote(symbol: string): StockQuote {
-    // First get the index from our market data function
-    const indices = this.getMarketIndices();
-    const index = indices.find(idx => idx.symbol === symbol);
+  private async getMarketIndexQuote(symbol: string): Promise<StockQuote> {
+    // First get the index from our market data function with 1D timeframe
+    const indices = await this.getMarketIndices("1D");
+    const index = indices.find((idx: MarketIndex) => idx.symbol === symbol);
     
     if (index) {
       return {

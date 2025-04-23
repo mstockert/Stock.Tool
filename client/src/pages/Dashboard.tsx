@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { queryClient } from "@/lib/queryClient";
 import MarketOverview from "@/components/MarketOverview";
 import StockDetail from "@/components/StockDetail";
 import TechnicalIndicators from "@/components/TechnicalIndicators";
@@ -28,6 +29,9 @@ export default function Dashboard() {
 
   const handleTimeframeChange = (value: string) => {
     setTimeframe(value as TimeframeOption);
+    // Force refresh data when timeframe changes
+    queryClient.invalidateQueries({ queryKey: ["/api/market/indices"] });
+    queryClient.invalidateQueries({ queryKey: [`/api/stocks/history/${defaultSymbol}`] });
   };
 
   return (

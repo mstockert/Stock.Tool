@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import MarketOverview from "@/components/MarketOverview";
 import NewsSection from "@/components/NewsSection";
@@ -17,6 +18,8 @@ export default function MarketsPage() {
 
   const handleTimeframeChange = (value: string) => {
     setTimeframe(value as TimeframeOption);
+    // Force refresh market data when timeframe changes
+    queryClient.invalidateQueries({ queryKey: ["/api/market/indices"] });
   };
 
   return (

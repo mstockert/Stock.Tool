@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { MarketIndex } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import MiniChart from "@/components/MiniChart";
@@ -73,6 +74,8 @@ export default function MarketOverview({ externalTimeframe }: MarketOverviewProp
 
   const handleTimeframeChange = (value: string) => {
     setLocalTimeframe(value as TimeframeOption);
+    // Force refresh the data when timeframe changes
+    queryClient.invalidateQueries({ queryKey: ["/api/market/indices"] });
   };
   
   return (

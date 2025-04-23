@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { StockQuote, StockHistory } from "@shared/schema";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Minus, Star, StarHalf, Maximize2 } from "lucide-react";
@@ -19,6 +19,11 @@ type StockDetailProps = {
 
 export default function StockDetail({ symbol, initialTimeframe = "1D" }: StockDetailProps) {
   const [timeframe, setTimeframe] = useState<TimeframeOption>(initialTimeframe);
+  
+  // Update timeframe when initialTimeframe prop changes
+  useEffect(() => {
+    setTimeframe(initialTimeframe);
+  }, [initialTimeframe]);
   const [isFavorite, setIsFavorite] = useState(false);
   const { toast } = useToast();
 
@@ -28,6 +33,13 @@ export default function StockDetail({ symbol, initialTimeframe = "1D" }: StockDe
 
   const { data: history, isLoading: historyLoading } = useQuery<StockHistory[]>({
     queryKey: [`/api/stocks/history/${symbol}`, timeframe],
+    queryFn: async () => {
+      const response = await fetch(`/api/stocks/history/${symbol}?timeframe=${timeframe}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch stock history');
+      }
+      return response.json();
+    },
     enabled: !!symbol,
   });
 

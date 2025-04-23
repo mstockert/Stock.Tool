@@ -15,11 +15,18 @@ import {
 
 type TimeframeOption = "1D" | "1W" | "1M" | "3M" | "1Y";
 
-export default function MarketOverview() {
-  const [timeframe, setTimeframe] = useState<TimeframeOption>("1D");
+type MarketOverviewProps = {
+  externalTimeframe?: TimeframeOption;
+};
+
+export default function MarketOverview({ externalTimeframe }: MarketOverviewProps = {}) {
+  const [localTimeframe, setLocalTimeframe] = useState<TimeframeOption>("1D");
+  
+  // Use external timeframe if provided, otherwise use local state
+  const timeframe = externalTimeframe || localTimeframe;
   
   const { data: indices, isLoading, error } = useQuery<MarketIndex[]>({
-    queryKey: ["/api/market/indices", timeframe],
+    queryKey: ["/api/market/indices"],
   });
 
   const formatValue = (value: number) => {
@@ -58,7 +65,7 @@ export default function MarketOverview() {
   }
 
   const handleTimeframeChange = (value: string) => {
-    setTimeframe(value as TimeframeOption);
+    setLocalTimeframe(value as TimeframeOption);
   };
   
   return (

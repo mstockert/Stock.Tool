@@ -54,7 +54,7 @@ export default function MarketsPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                  <MarketOverview />
+                  <MarketOverview externalTimeframe={timeframe} />
                 </div>
               </div>
             </CardContent>

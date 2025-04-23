@@ -216,6 +216,9 @@ export default function WatchlistPage() {
           <DialogContent className="bg-white dark:bg-dark-surface text-black dark:text-text-primary">
             <DialogHeader>
               <DialogTitle className="text-black dark:text-white">Create New Watchlist</DialogTitle>
+              <DialogDescription className="text-gray-700 dark:text-gray-300">
+                Enter a name for your new watchlist
+              </DialogDescription>
             </DialogHeader>
             <div className="py-4">
               <Input

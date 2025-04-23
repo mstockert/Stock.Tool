@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { SearchBar } from "@/components/SearchBar";
 import { cn } from "@/lib/utils";
-import { MenuIcon, LineChart, LayoutDashboard, Star, PieChart, BarChart2, Filter, Calculator, Newspaper, Settings, Bell } from "lucide-react";
+import { MenuIcon, LineChart, LayoutDashboard, Star, PieChart, BarChart2, Filter, Calculator, Newspaper, Settings, Bell, Plus } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-mobile";
+import { useQuery } from "@tanstack/react-query";
 
 type SidebarLinkProps = {
   icon: React.ReactNode;
@@ -41,10 +42,24 @@ type MainLayoutProps = {
   children: React.ReactNode;
 };
 
+// Define watchlist type for the sidebar
+type SidebarWatchlist = {
+  id: number;
+  name: string;
+  symbols: Array<{ id: number; symbol: string; }>;
+};
+
 const MainLayout = ({ children }: MainLayoutProps) => {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isMobile = useMediaQuery("(max-width: 768px)");
+  
+  // Fetch watchlists for the sidebar
+  const { data: watchlists } = useQuery<SidebarWatchlist[]>({
+    queryKey: ["/api/watchlists"],
+    initialData: [],
+    refetchInterval: 30000, // Refresh every 30s
+  });
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -54,6 +69,12 @@ const MainLayout = ({ children }: MainLayoutProps) => {
     if (isMobile) {
       setSidebarOpen(false);
     }
+  };
+  
+  const goToWatchlistsPage = () => {
+    // Redirect to watchlists page
+    window.location.href = '/watchlists';
+    closeSidebarOnMobile();
   };
 
   return (
@@ -154,37 +175,32 @@ const MainLayout = ({ children }: MainLayoutProps) => {
               <h2 className="text-text-secondary text-xs uppercase font-medium tracking-wider">Watchlists</h2>
             </div>
             <ul>
-              <li>
-                <SidebarLink 
-                  icon={<Filter className="h-5 w-5" />} 
-                  label="Tech Stocks" 
-                  href="/watchlists/tech" 
-                  active={location === "/watchlists/tech"} 
-                  badge="8"
-                  onClick={closeSidebarOnMobile}
-                />
-              </li>
-              <li>
-                <SidebarLink 
-                  icon={<Filter className="h-5 w-5" />} 
-                  label="Energy Sector" 
-                  href="/watchlists/energy" 
-                  active={location === "/watchlists/energy"} 
-                  badge="5"
-                  onClick={closeSidebarOnMobile}
-                />
-              </li>
+              {watchlists && watchlists.length > 0 ? (
+                watchlists.map(list => (
+                  <li key={list.id}>
+                    <SidebarLink 
+                      icon={<Filter className="h-5 w-5" />} 
+                      label={list.name} 
+                      href="/watchlists" 
+                      active={location === "/watchlists"} 
+                      badge={list.symbols?.length || 0}
+                      onClick={closeSidebarOnMobile}
+                    />
+                  </li>
+                ))
+              ) : (
+                <li className="px-4 py-2 text-text-secondary text-sm">No watchlists found</li>
+              )}
               <li>
                 <a 
                   href="#" 
                   className="flex items-center px-4 py-2.5 text-text-secondary hover:bg-dark-surface-2"
                   onClick={(e) => {
                     e.preventDefault();
-                    // Add new watchlist functionality would go here
-                    closeSidebarOnMobile();
+                    goToWatchlistsPage();
                   }}
                 >
-                  <span className="mr-3">+</span>
+                  <span className="mr-3"><Plus className="h-4 w-4" /></span>
                   <span>New Watchlist</span>
                 </a>
               </li>

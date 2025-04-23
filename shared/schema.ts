@@ -7,11 +7,15 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  email: text("email"),
+  fullName: text("full_name"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  email: true,
+  fullName: true,
 });
 
 // Watchlist schema
@@ -61,10 +65,15 @@ export const insertUserPreferencesSchema = createInsertSchema(userPreferences).p
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
-export type Watchlist = typeof watchlists.$inferSelect;
+export type Watchlist = typeof watchlists.$inferSelect & {
+  symbols?: WatchlistSymbol[];
+};
 export type InsertWatchlist = z.infer<typeof insertWatchlistSchema>;
 
-export type WatchlistSymbol = typeof watchlistSymbols.$inferSelect;
+export type WatchlistSymbol = typeof watchlistSymbols.$inferSelect & {
+  price?: number;
+  changePercent?: number;
+};
 export type InsertWatchlistSymbol = z.infer<typeof insertWatchlistSymbolSchema>;
 
 export type UserPreference = typeof userPreferences.$inferSelect;

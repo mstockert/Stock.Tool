@@ -393,6 +393,39 @@ export default function WatchlistPage() {
           </CardContent>
         </Card>
       )}
+      
+      {/* Delete Watchlist Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="bg-white dark:bg-dark-surface text-black dark:text-text-primary">
+          <DialogHeader>
+            <DialogTitle className="text-black dark:text-white">Delete Watchlist</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-gray-700 dark:text-gray-300">
+              Are you sure you want to delete this watchlist? This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setWatchlistToDelete(null);
+              }}
+              className="mr-2"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={deleteWatchlist}
+              disabled={isDeletingWatchlist}
+            >
+              {isDeletingWatchlist ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

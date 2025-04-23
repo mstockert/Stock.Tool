@@ -171,6 +171,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error removing symbol from watchlist" });
     }
   });
+  
+  app.delete("/api/watchlists/:id", async (req, res) => {
+    try {
+      const watchlistId = parseInt(req.params.id);
+      await storage.deleteWatchlist(watchlistId);
+      res.status(204).send();
+    } catch (error) {
+      console.error(`Error deleting watchlist ${req.params.id}:`, error);
+      res.status(500).json({ message: `Error deleting watchlist ${req.params.id}` });
+    }
+  });
 
   // User preferences
   app.get("/api/user/preferences", async (req, res) => {

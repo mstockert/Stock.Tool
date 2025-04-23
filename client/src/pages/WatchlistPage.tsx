@@ -39,6 +39,9 @@ export default function WatchlistPage() {
   const [isAddingSymbol, setIsAddingSymbol] = useState(false);
   const [watchlistDialogOpen, setWatchlistDialogOpen] = useState(false);
   const [symbolDialogOpen, setSymbolDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [watchlistToDelete, setWatchlistToDelete] = useState<number | null>(null);
+  const [isDeletingWatchlist, setIsDeletingWatchlist] = useState(false);
   const { toast } = useToast();
 
   const { data: watchlists, isLoading, refetch } = useQuery<Watchlist[]>({
@@ -143,6 +146,49 @@ export default function WatchlistPage() {
         description: "Failed to remove symbol. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+  
+  const openDeleteDialog = (watchlistId: number) => {
+    setWatchlistToDelete(watchlistId);
+    setDeleteDialogOpen(true);
+  };
+  
+  const deleteWatchlist = async () => {
+    if (!watchlistToDelete) return;
+    
+    setIsDeletingWatchlist(true);
+    try {
+      await apiRequest("DELETE", `/api/watchlists/${watchlistToDelete}`, undefined);
+      
+      toast({
+        title: "Watchlist Deleted",
+        description: "Your watchlist has been deleted.",
+      });
+      
+      // Refresh the watchlist data
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlists"] });
+      // Also manually refetch to make sure we have the latest data
+      refetch();
+      
+      // If we deleted the active watchlist, reset active to the first one
+      if (watchlistToDelete.toString() === activeWatchlist && watchlists && watchlists.length > 1) {
+        const remainingWatchlists = watchlists.filter(w => w.id !== watchlistToDelete);
+        if (remainingWatchlists.length > 0) {
+          setActiveWatchlist(remainingWatchlists[0].id.toString());
+        }
+      }
+      
+      setDeleteDialogOpen(false);
+      setWatchlistToDelete(null);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete watchlist. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingWatchlist(false);
     }
   };
 
@@ -259,8 +305,16 @@ export default function WatchlistPage() {
           {watchlists.map((list) => (
             <TabsContent key={list.id} value={list.id.toString()}>
               <Card className="bg-dark-surface">
-                <CardHeader className="px-6 py-4 border-b border-gray-800">
+                <CardHeader className="px-6 py-4 border-b border-gray-800 flex justify-between items-center">
                   <CardTitle>{list.name}</CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-text-secondary hover:text-destructive"
+                    onClick={() => openDeleteDialog(list.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </CardHeader>
                 <CardContent className="p-0">
                   {list.symbols && list.symbols.length > 0 ? (

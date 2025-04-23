@@ -23,6 +23,7 @@ export interface IStorage {
   getWatchlistsByUserId(userId: number): Promise<Watchlist[]>;
   getWatchlist(id: number): Promise<Watchlist | undefined>;
   createWatchlist(watchlist: InsertWatchlist): Promise<Watchlist>;
+  deleteWatchlist(id: number): Promise<void>;
   addSymbolToWatchlist(symbol: InsertWatchlistSymbol): Promise<WatchlistSymbol>;
   removeSymbolFromWatchlist(symbolId: number, watchlistId: number): Promise<void>;
   
@@ -119,6 +120,20 @@ export class MemStorage implements IStorage {
     };
     this.watchlists.set(id, newWatchlist);
     return newWatchlist;
+  }
+  
+  async deleteWatchlist(id: number): Promise<void> {
+    // Delete the watchlist
+    this.watchlists.delete(id);
+    
+    // Delete all symbols associated with this watchlist
+    const symbolsToDelete = Array.from(this.watchlistSymbols.values())
+      .filter(symbol => symbol.watchlistId === id)
+      .map(symbol => symbol.id);
+    
+    symbolsToDelete.forEach(symbolId => {
+      this.watchlistSymbols.delete(symbolId);
+    });
   }
 
   async addSymbolToWatchlist(symbolData: InsertWatchlistSymbol): Promise<WatchlistSymbol> {

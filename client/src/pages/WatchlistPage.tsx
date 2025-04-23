@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { 
   Dialog, 
   DialogContent, 
+  DialogDescription,
   DialogHeader, 
   DialogTitle, 
   DialogTrigger,
@@ -159,19 +160,19 @@ export default function WatchlistPage() {
     
     setIsDeletingWatchlist(true);
     try {
-      await apiRequest("DELETE", `/api/watchlists/${watchlistToDelete}`, undefined);
+      const response = await apiRequest("DELETE", `/api/watchlists/${watchlistToDelete}`, undefined);
+      
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
       
       toast({
         title: "Watchlist Deleted",
         description: "Your watchlist has been deleted.",
       });
       
-      // Refresh the watchlist data
-      queryClient.invalidateQueries({ queryKey: ["/api/watchlists"] });
-      // Also manually refetch to make sure we have the latest data
-      refetch();
-      
-      // If we deleted the active watchlist, reset active to the first one
+      // Select a new active watchlist first before refreshing data
+      // This prevents issues with the current active watchlist being deleted
       if (watchlistToDelete.toString() === activeWatchlist && watchlists && watchlists.length > 1) {
         const remainingWatchlists = watchlists.filter(w => w.id !== watchlistToDelete);
         if (remainingWatchlists.length > 0) {
@@ -179,9 +180,15 @@ export default function WatchlistPage() {
         }
       }
       
+      // Refresh the watchlist data
+      await queryClient.invalidateQueries({ queryKey: ["/api/watchlists"] });
+      // Also manually refetch to make sure we have the latest data
+      await refetch();
+      
       setDeleteDialogOpen(false);
       setWatchlistToDelete(null);
     } catch (error) {
+      console.error("Error deleting watchlist:", error);
       toast({
         title: "Error",
         description: "Failed to delete watchlist. Please try again.",
@@ -274,6 +281,9 @@ export default function WatchlistPage() {
               <DialogContent className="bg-white dark:bg-dark-surface text-black dark:text-text-primary">
                 <DialogHeader>
                   <DialogTitle className="text-black dark:text-white">Add Symbol to Watchlist</DialogTitle>
+                  <DialogDescription className="text-gray-700 dark:text-gray-300">
+                    Enter a stock symbol to add to your watchlist
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
                   <Input
@@ -399,6 +409,9 @@ export default function WatchlistPage() {
         <DialogContent className="bg-white dark:bg-dark-surface text-black dark:text-text-primary">
           <DialogHeader>
             <DialogTitle className="text-black dark:text-white">Delete Watchlist</DialogTitle>
+            <DialogDescription className="text-gray-700 dark:text-gray-300">
+              Confirm if you want to delete this watchlist
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <p className="text-gray-700 dark:text-gray-300">

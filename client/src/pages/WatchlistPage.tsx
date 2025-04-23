@@ -41,10 +41,21 @@ export default function WatchlistPage() {
   const [symbolDialogOpen, setSymbolDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: watchlists, isLoading } = useQuery<Watchlist[]>({
+  const { data: watchlists, isLoading, refetch } = useQuery<Watchlist[]>({
     queryKey: ["/api/watchlists"],
     initialData: [],
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000, // Refresh every 30s
   });
+  
+  // Initialize default watchlist if none exists
+  useEffect(() => {
+    if (!isLoading && watchlists && watchlists.length === 0) {
+      setWatchlistDialogOpen(true);
+    } else if (watchlists && watchlists.length > 0 && !activeWatchlist) {
+      setActiveWatchlist(watchlists[0].id.toString());
+    }
+  }, [isLoading, watchlists, activeWatchlist]);
 
   const createWatchlist = async () => {
     if (!newWatchlistName.trim()) return;
@@ -65,6 +76,8 @@ export default function WatchlistPage() {
       
       // Refresh the watchlist data
       queryClient.invalidateQueries({ queryKey: ["/api/watchlists"] });
+      // Also manually refetch to make sure we have the latest data
+      refetch();
       setNewWatchlistName("");
       setWatchlistDialogOpen(false);
       setActiveWatchlist(newWatchlist.id.toString());
@@ -96,6 +109,8 @@ export default function WatchlistPage() {
       
       // Refresh the watchlist data
       queryClient.invalidateQueries({ queryKey: ["/api/watchlists"] });
+      // Also manually refetch to make sure we have the latest data
+      refetch();
       setNewSymbol("");
       setSymbolDialogOpen(false);
     } catch (error) {
@@ -120,6 +135,8 @@ export default function WatchlistPage() {
       
       // Refresh the watchlist data
       queryClient.invalidateQueries({ queryKey: ["/api/watchlists"] });
+      // Also manually refetch to make sure we have the latest data
+      refetch();
     } catch (error) {
       toast({
         title: "Error",
@@ -194,7 +211,7 @@ export default function WatchlistPage() {
                 <TabsTrigger
                   key={list.id}
                   value={list.id.toString()}
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  className="text-black dark:text-text-primary data-[state=active]:bg-primary data-[state=active]:text-white"
                 >
                   {list.name}
                 </TabsTrigger>

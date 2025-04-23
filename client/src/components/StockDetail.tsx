@@ -14,10 +14,11 @@ type TimeframeOption = "1D" | "1W" | "1M" | "3M" | "1Y" | "5Y";
 
 type StockDetailProps = {
   symbol: string;
+  initialTimeframe?: TimeframeOption;
 };
 
-export default function StockDetail({ symbol }: StockDetailProps) {
-  const [timeframe, setTimeframe] = useState<TimeframeOption>("1D");
+export default function StockDetail({ symbol, initialTimeframe = "1D" }: StockDetailProps) {
+  const [timeframe, setTimeframe] = useState<TimeframeOption>(initialTimeframe);
   const [isFavorite, setIsFavorite] = useState(false);
   const { toast } = useToast();
 
@@ -103,8 +104,8 @@ export default function StockDetail({ symbol }: StockDetailProps) {
                         : "font-mono text-negative"
                     }
                   >
-                    {quote?.change >= 0 ? "+" : ""}
-                    {quote?.change.toFixed(2)} ({(quote?.changePercent || 0) * 100}%)
+                    {(quote?.change || 0) >= 0 ? "+" : ""}
+                    {(quote?.change || 0).toFixed(2)} ({(quote?.changePercent || 0) * 100}%)
                   </span>
                 </div>
               </>
@@ -166,7 +167,7 @@ export default function StockDetail({ symbol }: StockDetailProps) {
                 {isLoading ? (
                   <Skeleton className="h-5 w-16 mt-1" />
                 ) : (
-                  <p className="font-mono">${quote?.open.toFixed(2)}</p>
+                  <p className="font-mono">${(quote?.open || 0).toFixed(2)}</p>
                 )}
               </div>
               <div>
@@ -174,7 +175,7 @@ export default function StockDetail({ symbol }: StockDetailProps) {
                 {isLoading ? (
                   <Skeleton className="h-5 w-16 mt-1" />
                 ) : (
-                  <p className="font-mono">${quote?.high.toFixed(2)}</p>
+                  <p className="font-mono">${(quote?.high || 0).toFixed(2)}</p>
                 )}
               </div>
               <div>
@@ -182,7 +183,7 @@ export default function StockDetail({ symbol }: StockDetailProps) {
                 {isLoading ? (
                   <Skeleton className="h-5 w-16 mt-1" />
                 ) : (
-                  <p className="font-mono">${quote?.low.toFixed(2)}</p>
+                  <p className="font-mono">${(quote?.low || 0).toFixed(2)}</p>
                 )}
               </div>
               <div>
@@ -190,7 +191,7 @@ export default function StockDetail({ symbol }: StockDetailProps) {
                 {isLoading ? (
                   <Skeleton className="h-5 w-16 mt-1" />
                 ) : (
-                  <p className="font-mono">${quote?.close.toFixed(2)}</p>
+                  <p className="font-mono">${(quote?.close || 0).toFixed(2)}</p>
                 )}
               </div>
               <div>

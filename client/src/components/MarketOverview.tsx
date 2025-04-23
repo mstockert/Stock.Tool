@@ -57,8 +57,27 @@ export default function MarketOverview() {
     );
   }
 
+  const handleTimeframeChange = (value: string) => {
+    setTimeframe(value as TimeframeOption);
+  };
+  
   return (
     <>
+      <div className="flex justify-end mb-4">
+        <Select value={timeframe} onValueChange={handleTimeframeChange}>
+          <SelectTrigger className="w-[100px]">
+            <SelectValue placeholder="Timeframe" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1D">1 Day</SelectItem>
+            <SelectItem value="1W">1 Week</SelectItem>
+            <SelectItem value="1M">1 Month</SelectItem>
+            <SelectItem value="3M">3 Months</SelectItem>
+            <SelectItem value="1Y">1 Year</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
       {isLoading
         ? renderSkeletonItems()
         : indices?.map((index) => (

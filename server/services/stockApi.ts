@@ -210,16 +210,18 @@ export class StockApiService {
 
       const response = await axios.get(this.baseUrl, { params });
       
-      let timeSeriesKey;
+      let timeSeriesKey: string | undefined;
       if (params.function === "TIME_SERIES_INTRADAY") {
         timeSeriesKey = `Time Series (${params.interval})`;
       } else if (params.function === "TIME_SERIES_DAILY") {
         timeSeriesKey = "Time Series (Daily)";
       } else if (params.function === "TIME_SERIES_WEEKLY") {
         timeSeriesKey = "Weekly Time Series";
+      } else if (params.function === "TIME_SERIES_MONTHLY") {
+        timeSeriesKey = "Monthly Time Series";
       }
 
-      const timeSeries = response.data[timeSeriesKey];
+      const timeSeries = timeSeriesKey ? response.data[timeSeriesKey] : null;
       
       if (!timeSeries) {
         throw new Error("Historical data not available");

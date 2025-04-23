@@ -29,9 +29,23 @@ export default function Dashboard() {
 
   const handleTimeframeChange = (value: string) => {
     setTimeframe(value as TimeframeOption);
+    
     // Force refresh data when timeframe changes
-    queryClient.invalidateQueries({ queryKey: ["/api/market/indices"] });
-    queryClient.invalidateQueries({ queryKey: [`/api/stocks/history/${defaultSymbol}`] });
+    // Use exact timeframe in query key
+    queryClient.invalidateQueries({ queryKey: ["/api/market/indices", value] });
+    queryClient.invalidateQueries({ queryKey: [`/api/stocks/history/${defaultSymbol}`, value] });
+    
+    // Force immediate refetch with new timeframe
+    queryClient.refetchQueries({ 
+      queryKey: ["/api/market/indices", value],
+      exact: true 
+    });
+    queryClient.refetchQueries({ 
+      queryKey: [`/api/stocks/history/${defaultSymbol}`, value],
+      exact: true 
+    });
+    
+    console.log(`Dashboard timeframe changed to ${value} - refreshing data`);
   };
 
   return (

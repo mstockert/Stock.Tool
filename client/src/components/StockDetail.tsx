@@ -24,10 +24,22 @@ export default function StockDetail({ symbol, initialTimeframe = "1D" }: StockDe
   useEffect(() => {
     if (timeframe !== initialTimeframe) {
       setTimeframe(initialTimeframe);
+      
       // Force refetch when timeframe changes from parent
-      queryClient.invalidateQueries({ queryKey: [`/api/stocks/history/${symbol}`] });
+      // Use specific timeframe in query key for better cache management
+      queryClient.invalidateQueries({ 
+        queryKey: [`/api/stocks/history/${symbol}`, initialTimeframe] 
+      });
+      
+      // Force immediate refetch with new timeframe
+      queryClient.refetchQueries({ 
+        queryKey: [`/api/stocks/history/${symbol}`, initialTimeframe],
+        exact: true 
+      });
+      
+      console.log(`StockDetail for ${symbol} updated to timeframe ${initialTimeframe} from parent`);
     }
-  }, [initialTimeframe, symbol, timeframe, queryClient]);
+  }, [initialTimeframe, symbol, timeframe]);
   const [isFavorite, setIsFavorite] = useState(false);
   const { toast } = useToast();
 
@@ -61,9 +73,20 @@ export default function StockDetail({ symbol, initialTimeframe = "1D" }: StockDe
 
   const handleTimeframeChange = (newTimeframe: TimeframeOption) => {
     setTimeframe(newTimeframe);
+    
     // Force refetch when timeframe changes
-    // Use only the base endpoint for invalidation to ensure it works with any timeframe
-    queryClient.invalidateQueries({ queryKey: [`/api/stocks/history/${symbol}`] });
+    // Make sure to use specific timeframe in query key
+    queryClient.invalidateQueries({ 
+      queryKey: [`/api/stocks/history/${symbol}`, newTimeframe] 
+    });
+    
+    // Force immediate refetch with new timeframe
+    queryClient.refetchQueries({ 
+      queryKey: [`/api/stocks/history/${symbol}`, newTimeframe],
+      exact: true 
+    });
+    
+    console.log(`Stock ${symbol} timeframe changed to ${newTimeframe} - refreshing data`);
   };
 
   const toggleFavorite = async () => {

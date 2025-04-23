@@ -77,7 +77,16 @@ export default function MarketOverview({ externalTimeframe }: MarketOverviewProp
   const handleTimeframeChange = (value: string) => {
     setLocalTimeframe(value as TimeframeOption);
     // Force refresh the data when timeframe changes
-    queryClient.invalidateQueries({ queryKey: ["/api/market/indices"] });
+    // Need to use more specific query key that includes timeframe
+    queryClient.invalidateQueries({ queryKey: ["/api/market/indices", value] });
+    
+    // Force immediate refetch
+    queryClient.refetchQueries({ 
+      queryKey: ["/api/market/indices", value],
+      exact: true 
+    });
+    
+    console.log(`Timeframe changed to ${value} - invalidating queries`);
   };
   
   return (

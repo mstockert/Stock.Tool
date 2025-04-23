@@ -19,7 +19,15 @@ export default function MarketsPage() {
   const handleTimeframeChange = (value: string) => {
     setTimeframe(value as TimeframeOption);
     // Force refresh market data when timeframe changes
-    queryClient.invalidateQueries({ queryKey: ["/api/market/indices"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/market/indices", value] });
+    
+    // Force immediate refetch with new timeframe 
+    queryClient.refetchQueries({ 
+      queryKey: ["/api/market/indices", value],
+      exact: true 
+    });
+    
+    console.log(`Markets page timeframe changed to ${value} - refreshing data`);
   };
 
   return (

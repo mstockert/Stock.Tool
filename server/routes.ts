@@ -13,6 +13,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Support timeframe parameter
       const timeframe = req.query.timeframe as string || "1D";
+      const timestamp = req.query._t as string || '';
+      
+      console.log(`Market indices API called with timeframe: ${timeframe} (timestamp: ${timestamp})`);
       
       // Disable caching to ensure fresh data for each timeframe
       res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -20,6 +23,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Expires', '0');
       
       const indices = await stockApi.getMarketIndices(timeframe);
+      
+      console.log(`Responding with ${indices.length} market indices for timeframe ${timeframe}`);
       res.json(indices);
     } catch (error) {
       console.error("Error fetching market indices:", error);

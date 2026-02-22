@@ -156,3 +156,106 @@ export type SearchResult = {
   change?: number;
   changePercent?: number;
 };
+
+// Portfolio schemas
+export const portfolios = pgTable("portfolios", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPortfolioSchema = createInsertSchema(portfolios).pick({
+  userId: true,
+  name: true,
+});
+
+export const portfolioHoldings = pgTable("portfolio_holdings", {
+  id: serial("id").primaryKey(),
+  portfolioId: integer("portfolio_id").references(() => portfolios.id),
+  symbol: text("symbol").notNull(),
+  companyName: text("company_name"),
+  shares: text("shares").notNull(), // stored as text to preserve decimal precision
+  avgCost: text("avg_cost").notNull(), // stored as text to preserve decimal precision
+  purchaseDate: timestamp("purchase_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortfolioHoldingSchema = createInsertSchema(portfolioHoldings).pick({
+  portfolioId: true,
+  symbol: true,
+  companyName: true,
+  shares: true,
+  avgCost: true,
+  purchaseDate: true,
+});
+
+// Portfolio types
+export type Portfolio = typeof portfolios.$inferSelect & {
+  holdings?: PortfolioHolding[];
+};
+export type InsertPortfolio = z.infer<typeof insertPortfolioSchema>;
+
+export type PortfolioHolding = typeof portfolioHoldings.$inferSelect & {
+  currentPrice?: number;
+  change?: number;
+  changePercent?: number;
+};
+export type InsertPortfolioHolding = z.infer<typeof insertPortfolioHoldingSchema>;
+
+// Price alerts schema
+export const priceAlerts = pgTable("price_alerts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  symbol: text("symbol").notNull(),
+  targetPrice: text("target_price").notNull(),
+  condition: text("condition").notNull(), // 'above' or 'below'
+  isActive: boolean("is_active").default(true),
+  isTriggered: boolean("is_triggered").default(false),
+  triggeredAt: timestamp("triggered_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPriceAlertSchema = createInsertSchema(priceAlerts).pick({
+  userId: true,
+  symbol: true,
+  targetPrice: true,
+  condition: true,
+});
+
+export type PriceAlert = typeof priceAlerts.$inferSelect;
+export type InsertPriceAlert = z.infer<typeof insertPriceAlertSchema>;
+
+// Trade journal schema
+export const tradeJournalEntries = pgTable("trade_journal_entries", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  symbol: text("symbol").notNull(),
+  action: text("action").notNull(), // 'buy' or 'sell'
+  shares: text("shares").notNull(),
+  price: text("price").notNull(),
+  totalValue: text("total_value").notNull(),
+  thesis: text("thesis"), // Why you made the trade
+  notes: text("notes"), // Additional notes
+  outcome: text("outcome"), // Post-trade reflection
+  tradeDate: timestamp("trade_date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTradeJournalEntrySchema = createInsertSchema(tradeJournalEntries).pick({
+  userId: true,
+  symbol: true,
+  action: true,
+  shares: true,
+  price: true,
+  totalValue: true,
+  thesis: true,
+  notes: true,
+  outcome: true,
+  tradeDate: true,
+});
+
+export type TradeJournalEntry = typeof tradeJournalEntries.$inferSelect;
+export type InsertTradeJournalEntry = z.infer<typeof insertTradeJournalEntrySchema>;

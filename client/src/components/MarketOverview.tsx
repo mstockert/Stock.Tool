@@ -51,15 +51,12 @@ export default function MarketOverview({ externalTimeframe }: MarketOverviewProp
       .fill(0)
       .map((_, i) => (
         <Card key={i} className="bg-dark-surface">
-          <CardContent className="p-4">
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <Skeleton className="h-5 w-20 mb-1" />
-                <Skeleton className="h-3 w-10" />
-              </div>
-              <Skeleton className="h-4 w-12" />
+          <CardContent className="p-3">
+            <div className="flex justify-between items-start mb-1">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-3 w-10" />
             </div>
-            <Skeleton className="h-6 w-24 mb-2" />
+            <Skeleton className="h-5 w-20 mb-1" />
             <Skeleton className="h-10 w-full rounded" />
           </CardContent>
         </Card>
@@ -113,26 +110,25 @@ export default function MarketOverview({ externalTimeframe }: MarketOverviewProp
         : indices?.map((index) => (
             <Link key={index.symbol} href={`/stock/${index.symbol}`} className="block">
               <Card className="bg-dark-surface hover:bg-dark-surface-2 transition-colors duration-200">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-medium">{index.name}</h3>
-                      <p className="text-xs text-text-secondary">{index.region}</p>
-                    </div>
+                <CardContent className="p-3">
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 className="font-medium text-sm truncate">{index.name}</h3>
                     <span
                       className={
-                        index.changePercent >= 0 ? "text-positive text-sm" : "text-negative text-sm"
+                        index.changePercent >= 0 ? "text-positive text-xs font-medium" : "text-negative text-xs font-medium"
                       }
                     >
                       {index.changePercent >= 0 ? "+" : ""}
-                      {(index.changePercent * 100).toFixed(1)}%
+                      {index.changePercent.toFixed(2)}%
                     </span>
                   </div>
-                  <p className="font-mono text-lg">{formatValue(index.price)}</p>
-                  <div className="mt-2 h-10 bg-dark-bg rounded">
-                    <MiniChart 
-                      data={index.sparkline || []} 
-                      color={index.changePercent >= 0 ? "#4CAF50" : "#F44336"} 
+                  <p className="font-mono text-base mb-1">{formatValue(index.price)}</p>
+                  <div className="h-20 rounded overflow-visible">
+                    <MiniChart
+                      data={index.sparkline || []}
+                      color={index.changePercent >= 0 ? "#22c55e" : "#ef4444"}
+                      showLabels={true}
+                      timeframe={timeframe}
                     />
                   </div>
                 </CardContent>

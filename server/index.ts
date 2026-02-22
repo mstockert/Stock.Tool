@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -56,15 +57,35 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
+  // Port selection: prefer `process.env.PORT` so callers can override
+  // (e.g. `PORT=6000 npm run dev`). Fall back to 5000 if not set.
+  // This port serves both the API and the client.
+  const port = parseInt(process.env.PORT || "", 10) || 5000;
+
+  // Some environments do not support `reusePort` on the listen options
+  // (can throw `ENOTSUP`). Attach an error listener and retry without
+  // the `reusePort` option when that happens so the dev server still starts.
+  const onListenError = (err: any) => {
+    if (err && err.code === "ENOTSUP") {
+      log(`listen ENOTSUP detected, retrying without reusePort: ${err.message}`);
+      server.removeListener("error", onListenError);
+      server.listen(port, () => {
+        log(`serving on port ${port}`);
+      });
+    } else {
+      // rethrow other errors so the top-level handler can catch/log
+      throw err;
+    }
+  };
+
+  server.on("error", onListenError);
+
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    server.removeListener("error", onListenError);
   });
 })();

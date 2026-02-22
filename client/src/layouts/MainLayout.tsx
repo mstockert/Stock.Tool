@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { SearchBar } from "@/components/SearchBar";
 import { cn } from "@/lib/utils";
-import { MenuIcon, LineChart, LayoutDashboard, Star, PieChart, BarChart2, Filter, Calculator, Newspaper, Settings, Bell, Plus } from "lucide-react";
+import { MenuIcon, LineChart, LayoutDashboard, Star, PieChart, BarChart2, Filter, Calculator, Newspaper, Settings, Bell, Plus, BookOpen } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-mobile";
 import { useQuery } from "@tanstack/react-query";
 
@@ -97,12 +97,12 @@ const MainLayout = ({ children }: MainLayoutProps) => {
           </div>
 
           <div className="flex items-center space-x-4">
-            <button className="p-2 rounded-full hover:bg-dark-surface-2" title="Settings">
+            <Link href="/settings" className="p-2 rounded-full hover:bg-dark-surface-2" title="Settings">
               <Settings className="h-5 w-5" />
-            </button>
-            <button className="p-2 rounded-full hover:bg-dark-surface-2" title="Notifications">
+            </Link>
+            <Link href="/alerts" className="p-2 rounded-full hover:bg-dark-surface-2" title="Price Alerts">
               <Bell className="h-5 w-5" />
-            </button>
+            </Link>
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
               <span className="font-medium text-white">U</span>
             </div>
@@ -161,11 +161,29 @@ const MainLayout = ({ children }: MainLayoutProps) => {
                 />
               </li>
               <li>
-                <SidebarLink 
-                  icon={<BarChart2 className="h-5 w-5" />} 
-                  label="Screener" 
-                  href="/screener" 
-                  active={location === "/screener"} 
+                <SidebarLink
+                  icon={<BarChart2 className="h-5 w-5" />}
+                  label="Screener"
+                  href="/screener"
+                  active={location === "/screener"}
+                  onClick={closeSidebarOnMobile}
+                />
+              </li>
+              <li>
+                <SidebarLink
+                  icon={<Bell className="h-5 w-5" />}
+                  label="Price Alerts"
+                  href="/alerts"
+                  active={location === "/alerts"}
+                  onClick={closeSidebarOnMobile}
+                />
+              </li>
+              <li>
+                <SidebarLink
+                  icon={<BookOpen className="h-5 w-5" />}
+                  label="Trade Journal"
+                  href="/journal"
+                  active={location === "/journal"}
                   onClick={closeSidebarOnMobile}
                 />
               </li>
@@ -211,20 +229,20 @@ const MainLayout = ({ children }: MainLayoutProps) => {
             </div>
             <ul>
               <li>
-                <SidebarLink 
-                  icon={<Filter className="h-5 w-5" />} 
-                  label="Technical Analysis" 
-                  href="/tools/technical" 
-                  active={location === "/tools/technical"} 
+                <SidebarLink
+                  icon={<Filter className="h-5 w-5" />}
+                  label="Technical Analysis"
+                  href="/technical"
+                  active={location === "/technical"}
                   onClick={closeSidebarOnMobile}
                 />
               </li>
               <li>
-                <SidebarLink 
-                  icon={<Calculator className="h-5 w-5" />} 
-                  label="Risk Calculator" 
-                  href="/tools/risk" 
-                  active={location === "/tools/risk"} 
+                <SidebarLink
+                  icon={<Calculator className="h-5 w-5" />}
+                  label="Risk Calculator"
+                  href="/risk-calculator"
+                  active={location === "/risk-calculator"}
                   onClick={closeSidebarOnMobile}
                 />
               </li>

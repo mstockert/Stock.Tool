@@ -7,7 +7,7 @@ import { queryClient } from "./lib/queryClient";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 
 createRoot(document.getElementById("root")!).render(
-  <ThemeProvider defaultTheme="dark" storageKey="stock-tool-theme">
+  <ThemeProvider defaultTheme="light" storageKey="stock-tool-theme">
     <QueryClientProvider client={queryClient}>
       <App />
       <Toaster />

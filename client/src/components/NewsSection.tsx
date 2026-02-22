@@ -1,7 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NewsItem } from "@shared/schema";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
+import { useState } from "react";
 
 type NewsSectionProps = {
   symbol?: string;
@@ -9,10 +12,18 @@ type NewsSectionProps = {
 
 export default function NewsSection({ symbol }: NewsSectionProps) {
   const endpoint = symbol ? `/api/news/${symbol}` : "/api/news";
-  
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const { data: news, isLoading, error } = useQuery<NewsItem[]>({
     queryKey: [endpoint],
   });
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: [endpoint] });
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
 
   const formatTimeAgo = (dateString: string) => {
     const now = new Date();
@@ -50,8 +61,17 @@ export default function NewsSection({ symbol }: NewsSectionProps) {
 
   return (
     <Card className="bg-dark-surface">
-      <CardHeader className="px-4 py-3 border-b border-gray-800">
+      <CardHeader className="px-4 py-3 border-b border-gray-800 flex flex-row justify-between items-center">
         <CardTitle className="text-base font-semibold">Recent News</CardTitle>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isLoading || isRefreshing}
+          className="h-8 w-8 p-0"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </Button>
       </CardHeader>
       <CardContent className="p-0">
         <div className="divide-y divide-gray-800">

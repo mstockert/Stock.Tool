@@ -149,6 +149,11 @@ export default function Watchlist() {
                   placeholder="Enter stock symbol (e.g. AAPL)"
                   value={newSymbol}
                   onChange={(e) => setNewSymbol(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newSymbol.trim()) {
+                      addSymbolToWatchlist();
+                    }
+                  }}
                   className="bg-dark-surface-2"
                 />
                 <Button 

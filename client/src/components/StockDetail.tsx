@@ -12,39 +12,39 @@ import { useToast } from "@/hooks/use-toast";
 
 type TimeframeOption = "1D" | "1W" | "1M" | "3M" | "1Y" | "5Y";
 
+type IndicatorState = {
+  showSMAShort: boolean;
+  showSMAMedium: boolean;
+  showSMALong: boolean;
+  showBollinger: boolean;
+};
+
 type StockDetailProps = {
   symbol: string;
   initialTimeframe?: TimeframeOption;
   onTimeframeChange?: (timeframe: TimeframeOption) => void;
 };
 
-export default function StockDetail({ 
-  symbol, 
+export default function StockDetail({
+  symbol,
   initialTimeframe = "1D",
   onTimeframeChange
 }: StockDetailProps) {
   const [timeframe, setTimeframe] = useState<TimeframeOption>(initialTimeframe);
-  
-  // Update timeframe when initialTimeframe prop changes
+  const [indicators, setIndicators] = useState<IndicatorState>({
+    showSMAShort: false,
+    showSMAMedium: false,
+    showSMALong: false,
+    showBollinger: false,
+  });
+
+  // Update timeframe when initialTimeframe prop changes from parent
   useEffect(() => {
     if (timeframe !== initialTimeframe) {
+      console.log(`StockDetail: Parent changed timeframe to ${initialTimeframe}`);
       setTimeframe(initialTimeframe);
-      
-      // Force refetch when timeframe changes from parent
-      // Use specific timeframe in query key for better cache management
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/stocks/history/${symbol}`, initialTimeframe] 
-      });
-      
-      // Force immediate refetch with new timeframe
-      queryClient.refetchQueries({ 
-        queryKey: [`/api/stocks/history/${symbol}`, initialTimeframe],
-        exact: true 
-      });
-      
-      console.log(`StockDetail for ${symbol} updated to timeframe ${initialTimeframe} from parent`);
     }
-  }, [initialTimeframe, symbol, timeframe]);
+  }, [initialTimeframe]);
   const [isFavorite, setIsFavorite] = useState(false);
   const { toast } = useToast();
 
@@ -54,16 +54,20 @@ export default function StockDetail({
 
   const { data: history, isLoading: historyLoading } = useQuery<StockHistory[]>({
     queryKey: [`/api/stocks/history/${symbol}`, timeframe],
-    queryFn: async () => {
-      // Add timestamp to prevent caching
-      const timestamp = new Date().getTime();
-      const response = await fetch(`/api/stocks/history/${symbol}?timeframe=${timeframe}&_t=${timestamp}`);
+    queryFn: async ({ queryKey }) => {
+      // Use the timeframe from the query key to ensure we fetch the right data
+      const [, tf] = queryKey;
+      console.log(`Fetching history for ${symbol} with timeframe: ${tf}`);
+      const response = await fetch(`/api/stocks/history/${symbol}?timeframe=${tf}`);
       if (!response.ok) {
         throw new Error('Failed to fetch stock history');
       }
-      return response.json();
+      const data = await response.json();
+      console.log(`Received ${data.length} data points for timeframe ${tf}`);
+      return data;
     },
     enabled: !!symbol,
+    staleTime: 0, // Always refetch when timeframe changes
   });
 
   const isLoading = quoteLoading || historyLoading;
@@ -77,22 +81,9 @@ export default function StockDetail({
   };
 
   const handleTimeframeChange = (newTimeframe: TimeframeOption) => {
+    console.log(`Changing timeframe from ${timeframe} to ${newTimeframe}`);
     setTimeframe(newTimeframe);
-    
-    // Force refetch when timeframe changes
-    // Make sure to use specific timeframe in query key
-    queryClient.invalidateQueries({ 
-      queryKey: [`/api/stocks/history/${symbol}`, newTimeframe] 
-    });
-    
-    // Force immediate refetch with new timeframe
-    queryClient.refetchQueries({ 
-      queryKey: [`/api/stocks/history/${symbol}`, newTimeframe],
-      exact: true 
-    });
-    
-    console.log(`Stock ${symbol} timeframe changed to ${newTimeframe} - refreshing data`);
-    
+
     // Call the parent's callback if provided
     if (onTimeframeChange) {
       onTimeframeChange(newTimeframe);
@@ -210,6 +201,8 @@ export default function StockDetail({
                 data={history || []}
                 timeframe={timeframe}
                 isPositive={(quote?.changePercent || 0) >= 0}
+                indicators={indicators}
+                onIndicatorChange={setIndicators}
               />
             )}
           </div>

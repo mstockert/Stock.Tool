@@ -8,23 +8,51 @@ import {
   NewsItem,
   SearchResult,
 } from "@shared/schema";
+import { ibkrApi } from "./ibkrApi";
 
 // This service handles all external stock API calls
 export class StockApiService {
   private readonly apiKey: string;
   private readonly baseUrl: string;
+  private readonly ibkrEnabled: boolean;
 
   constructor() {
     // API key would normally come from environment variables
     this.apiKey = process.env.STOCK_API_KEY || "demo";
     this.baseUrl = "https://www.alphavantage.co/query";
+    // Check if IBKR is enabled
+    this.ibkrEnabled = process.env.IBKR_ENABLED === "true";
+
+    if (this.ibkrEnabled) {
+      console.log("🔗 Interactive Brokers API enabled - will use real-time data from IB Gateway");
+    }
+  }
+
+  /**
+   * Check IBKR connection status
+   */
+  async getIBKRStatus(): Promise<{ enabled: boolean; authenticated: boolean; connected: boolean; message: string }> {
+    if (!this.ibkrEnabled) {
+      return {
+        enabled: false,
+        authenticated: false,
+        connected: false,
+        message: "IBKR integration is not enabled. Set IBKR_ENABLED=true in .env to enable.",
+      };
+    }
+
+    const status = await ibkrApi.checkAuthStatus();
+    return {
+      enabled: true,
+      ...status,
+    };
   }
 
   // Fetch major market indices
   // Helper function to get timeframe-specific market data
   // This is used by both getMarketIndices and getMarketIndexHistory
   private getTimeframeSensitiveMarketData(timeframe: string): MarketIndex[] {
-    // Base market data with very different values for easier debugging
+    // Base market data - changePercent is already in percentage form (0.8 = 0.8%)
     let baseIndices = [
       {
         symbol: "^GSPC",
@@ -33,7 +61,7 @@ export class StockApiService {
         change: 36.53,
         changePercent: 0.8,
         region: "US",
-        sparkline: [4550, 4565, 4560, 4570, 4580, 4587],
+        sparkline: [4520, 4535, 4550, 4540, 4560, 4555, 4570, 4565, 4580, 4575, 4590, 4587],
       },
       {
         symbol: "^IXIC",
@@ -42,7 +70,7 @@ export class StockApiService {
         change: 170.33,
         changePercent: 1.2,
         region: "US",
-        sparkline: [14200, 14250, 14280, 14300, 14320, 14346],
+        sparkline: [14150, 14180, 14200, 14220, 14250, 14230, 14280, 14300, 14290, 14320, 14340, 14346],
       },
       {
         symbol: "^DJI",
@@ -51,7 +79,7 @@ export class StockApiService {
         change: 143.36,
         changePercent: 0.4,
         region: "US",
-        sparkline: [36000, 36050, 36080, 36100, 36110, 36124],
+        sparkline: [35950, 35980, 36000, 36020, 36050, 36030, 36080, 36060, 36100, 36090, 36110, 36124],
       },
       {
         symbol: "^FTSE",
@@ -60,7 +88,7 @@ export class StockApiService {
         change: -22.41,
         changePercent: -0.3,
         region: "UK",
-        sparkline: [7500, 7490, 7480, 7470, 7465, 7461],
+        sparkline: [7490, 7485, 7500, 7495, 7480, 7485, 7475, 7470, 7465, 7468, 7460, 7461],
       },
       {
         symbol: "^N225",
@@ -69,7 +97,7 @@ export class StockApiService {
         change: 174.54,
         changePercent: 0.6,
         region: "JP",
-        sparkline: [29200, 29250, 29280, 29300, 29320, 29332],
+        sparkline: [29150, 29180, 29200, 29220, 29250, 29230, 29280, 29260, 29300, 29290, 29320, 29332],
       },
       {
         symbol: "^GDAXI",
@@ -78,84 +106,78 @@ export class StockApiService {
         change: -15.73,
         changePercent: -0.1,
         region: "DE",
-        sparkline: [15750, 15745, 15740, 15735, 15730, 15728],
+        sparkline: [15745, 15750, 15740, 15745, 15735, 15738, 15730, 15735, 15728, 15732, 15725, 15728],
       },
     ];
     
-    // Create completely different data sets for each timeframe
-    // This ensures we can clearly see the timeframe changes working
+    // Generate realistic sparkline data with more data points
+    const generateSparkline = (basePrice: number, changePercent: number, points: number = 12) => {
+      const data: number[] = [];
+      const trend = changePercent > 0 ? 1 : -1;
+      const volatility = Math.abs(changePercent) * 0.3;
+
+      // Start from a point that will end near the current price
+      let price = basePrice * (1 - (changePercent / 100));
+
+      for (let i = 0; i < points; i++) {
+        const progress = i / (points - 1);
+        const trendComponent = (changePercent / 100) * progress * basePrice;
+        const noise = (Math.random() - 0.5) * volatility * basePrice * 0.01;
+        price = basePrice * (1 - (changePercent / 100)) + trendComponent + noise;
+        data.push(parseFloat(price.toFixed(2)));
+      }
+
+      // Ensure last point is close to current price
+      data[data.length - 1] = basePrice;
+      return data;
+    };
+
+    // Create data sets for each timeframe with realistic percentage changes
     const getTimeframeData = (index: any, timeframe: string) => {
+      // Keep price the same, just vary the change percent based on timeframe
       switch (timeframe) {
         case "1D":
           return {
             ...index,
-            // No changes for "1D" timeframe
+            sparkline: generateSparkline(index.price, index.changePercent, 12),
           };
         case "1W":
+          const weekChange = parseFloat((index.changePercent * 2.5).toFixed(2));
           return {
             ...index,
-            price: parseFloat((index.price * 1.05).toFixed(2)),
-            change: parseFloat((index.change * 5).toFixed(2)),
-            changePercent: parseFloat((index.changePercent * 5).toFixed(1)),
-            sparkline: [
-              index.price * 0.97, 
-              index.price * 0.98, 
-              index.price * 0.99, 
-              index.price * 1.02, 
-              index.price * 1.04, 
-              index.price * 1.05
-            ],
+            change: parseFloat((index.change * 2.5).toFixed(2)),
+            changePercent: weekChange,
+            sparkline: generateSparkline(index.price, weekChange, 14),
           };
         case "1M":
+          const monthChange = parseFloat((index.changePercent * 4).toFixed(2));
           return {
             ...index,
-            price: parseFloat((index.price * 1.10).toFixed(2)),
-            change: parseFloat((index.change * 8).toFixed(2)),
-            changePercent: parseFloat((index.changePercent * 8).toFixed(1)),
-            sparkline: [
-              index.price * 0.94, 
-              index.price * 0.97, 
-              index.price * 1.01, 
-              index.price * 1.05, 
-              index.price * 1.08, 
-              index.price * 1.10
-            ],
+            change: parseFloat((index.change * 4).toFixed(2)),
+            changePercent: monthChange,
+            sparkline: generateSparkline(index.price, monthChange, 20),
           };
         case "3M":
+          const quarterChange = parseFloat((index.changePercent * 8).toFixed(2));
           return {
             ...index,
-            price: parseFloat((index.price * 1.15).toFixed(2)),
-            change: parseFloat((index.change * 12).toFixed(2)),
-            changePercent: parseFloat((index.changePercent * 12).toFixed(1)),
-            sparkline: [
-              index.price * 0.90, 
-              index.price * 0.95, 
-              index.price * 1.02, 
-              index.price * 1.08, 
-              index.price * 1.12, 
-              index.price * 1.15
-            ],
+            change: parseFloat((index.change * 8).toFixed(2)),
+            changePercent: quarterChange,
+            sparkline: generateSparkline(index.price, quarterChange, 24),
           };
         case "1Y":
+          const yearChange = parseFloat((index.changePercent * 15).toFixed(2));
           return {
             ...index,
-            price: parseFloat((index.price * 1.25).toFixed(2)),
-            change: parseFloat((index.change * 20).toFixed(2)),
-            changePercent: parseFloat((index.changePercent * 20).toFixed(1)),
-            sparkline: [
-              index.price * 0.85, 
-              index.price * 0.95, 
-              index.price * 1.05, 
-              index.price * 1.15, 
-              index.price * 1.20, 
-              index.price * 1.25
-            ],
+            change: parseFloat((index.change * 15).toFixed(2)),
+            changePercent: yearChange,
+            sparkline: generateSparkline(index.price, yearChange, 30),
           };
         default:
           return index;
       }
     };
-    
+
     // Get the right data set based on timeframe
     return baseIndices.map(index => getTimeframeData(index, timeframe));
   }
@@ -223,7 +245,17 @@ export class StockApiService {
       if (symbol.startsWith('^')) {
         return await this.getMarketIndexQuote(symbol);
       }
-      
+
+      // Try IBKR first if enabled
+      if (this.ibkrEnabled) {
+        const ibkrQuote = await ibkrApi.getStockQuote(symbol);
+        if (ibkrQuote) {
+          console.log(`✅ IBKR quote for ${symbol}: $${ibkrQuote.price}`);
+          return ibkrQuote;
+        }
+        console.log(`⚠️ IBKR quote failed for ${symbol}, falling back to Alpha Vantage`);
+      }
+
       const params = {
         function: "GLOBAL_QUOTE",
         symbol,
@@ -356,7 +388,17 @@ export class StockApiService {
       if (symbol.startsWith('^')) {
         return this.getMarketIndexHistory(symbol, timeframe);
       }
-      
+
+      // Try IBKR first if enabled
+      if (this.ibkrEnabled) {
+        const ibkrHistory = await ibkrApi.getStockHistory(symbol, timeframe);
+        if (ibkrHistory && ibkrHistory.length > 0) {
+          console.log(`✅ IBKR history for ${symbol}: ${ibkrHistory.length} bars`);
+          return ibkrHistory;
+        }
+        console.log(`⚠️ IBKR history failed for ${symbol}, falling back to Alpha Vantage`);
+      }
+
       let params: any = {
         symbol,
         apikey: this.apiKey,
@@ -458,26 +500,80 @@ export class StockApiService {
       // Generate some sample data if API fails
       const history: StockHistory[] = [];
       const now = new Date();
-      const startPrice = symbol === "AAPL" ? 170 : 100;
-      
-      for (let i = 30; i >= 0; i--) {
-        const date = new Date(now);
-        date.setDate(date.getDate() - i);
-        
-        // Generate some realistic looking price movements
-        const dailyChange = (Math.random() - 0.5) * 3;
-        const price = startPrice + (i * dailyChange);
-        
-        history.push({
-          timestamp: date.toISOString().split('T')[0],
-          close: parseFloat(price.toFixed(2)),
-          high: parseFloat((price + Math.random() * 2).toFixed(2)),
-          low: parseFloat((price - Math.random() * 2).toFixed(2)),
-          open: parseFloat((price - dailyChange).toFixed(2)),
-          volume: Math.floor(Math.random() * 10000000) + 30000000,
-        });
+      const startPrice = symbol === "AAPL" ? 178 : symbol === "MSFT" ? 415 : symbol === "GOOGL" ? 175 : symbol === "AMZN" ? 185 : symbol === "NVDA" ? 125 : symbol === "META" ? 510 : symbol === "TSLA" ? 245 : 100;
+
+      if (timeframe === "1D") {
+        // Generate intraday data with 30-minute intervals up to current time
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const currentTimeInMinutes = currentHour * 60 + currentMinute;
+        const marketOpenMinutes = 9 * 60 + 30; // 9:30 AM
+        const marketCloseMinutes = 16 * 60; // 4:00 PM
+
+        // Calculate number of data points based on current time
+        let dataPoints: number;
+        if (currentTimeInMinutes < marketOpenMinutes) {
+          dataPoints = 1; // Before market open
+        } else if (currentTimeInMinutes >= marketCloseMinutes) {
+          dataPoints = 13; // After market close - full day
+        } else {
+          const elapsedMinutes = currentTimeInMinutes - marketOpenMinutes;
+          dataPoints = Math.max(1, Math.floor(elapsedMinutes / 30) + 1);
+        }
+
+        let currentPrice = startPrice * 0.995; // Start slightly below current price
+
+        for (let i = 0; i < dataPoints; i++) {
+          // Calculate time: 9:30 AM + i * 30 minutes
+          const minutesFromMidnight = 570 + (i * 30);
+          const hours = Math.floor(minutesFromMidnight / 60);
+          const minutes = minutesFromMidnight % 60;
+
+          // Format timestamp
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          const hoursStr = String(hours).padStart(2, '0');
+          const minutesStr = String(minutes).padStart(2, '0');
+          const timestamp = `${year}-${month}-${day} ${hoursStr}:${minutesStr}:00`;
+
+          // Generate realistic price movement
+          const change = (Math.random() - 0.48) * startPrice * 0.003; // Slight upward bias
+          currentPrice = currentPrice + change;
+
+          history.push({
+            timestamp,
+            close: parseFloat(currentPrice.toFixed(2)),
+            high: parseFloat((currentPrice + Math.random() * 0.5).toFixed(2)),
+            low: parseFloat((currentPrice - Math.random() * 0.5).toFixed(2)),
+            open: parseFloat((currentPrice - change).toFixed(2)),
+            volume: Math.floor(Math.random() * 10000000) + 30000000,
+          });
+        }
+      } else {
+        // Generate daily data for other timeframes
+        const days = timeframe === "1W" ? 7 : timeframe === "1M" ? 30 : timeframe === "3M" ? 90 : 365;
+        let currentPrice = startPrice * (1 - 0.001 * days / 10); // Start lower and trend up
+
+        for (let i = days; i >= 0; i--) {
+          const date = new Date(now);
+          date.setDate(date.getDate() - i);
+
+          // Generate realistic looking price movements
+          const dailyChange = (Math.random() - 0.48) * startPrice * 0.01;
+          currentPrice = currentPrice + dailyChange;
+
+          history.push({
+            timestamp: date.toISOString().split('T')[0],
+            close: parseFloat(currentPrice.toFixed(2)),
+            high: parseFloat((currentPrice + Math.random() * 2).toFixed(2)),
+            low: parseFloat((currentPrice - Math.random() * 2).toFixed(2)),
+            open: parseFloat((currentPrice - dailyChange).toFixed(2)),
+            volume: Math.floor(Math.random() * 10000000) + 30000000,
+          });
+        }
       }
-      
+
       return history;
     }
   }
@@ -552,103 +648,103 @@ export class StockApiService {
     
     switch (timeframe) {
       case "1D":
-        // Get current hour in ET to determine how much of the trading day to show
-        // Trading hours typically 9:30 AM - 4:00 PM ET
-        const currentHourET = new Date().getHours();
-        
-        // For demonstration, let's limit to actual market hours
-        // In a real app, we'd check if market is open and use the actual current time
-        const marketOpen = 9; // 9:30 AM ET
-        const marketClose = 16; // 4:00 PM ET
-        
-        // Calculate how many hours of trading day have passed
-        let tradingHoursPassed = Math.min(currentHourET - marketOpen, marketClose - marketOpen);
-        
-        // If after market hours, show full day
-        if (currentHourET >= marketClose) {
-          tradingHoursPassed = marketClose - marketOpen;
+        // Trading hours: 9:30 AM - 4:00 PM (6.5 hours)
+        // Calculate how many 30-minute intervals have passed since market open
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const currentTimeInMinutes = currentHour * 60 + currentMinute;
+        const marketOpenMinutes = 9 * 60 + 30; // 9:30 AM = 570 minutes
+        const marketCloseMinutes = 16 * 60; // 4:00 PM = 960 minutes
+
+        // Calculate elapsed trading minutes (capped at market hours)
+        let elapsedMinutes = currentTimeInMinutes - marketOpenMinutes;
+
+        if (currentTimeInMinutes < marketOpenMinutes) {
+          // Before market open - show previous day's data or minimal data
+          elapsedMinutes = 0;
+          dataPoints = 1;
+        } else if (currentTimeInMinutes >= marketCloseMinutes) {
+          // After market close - show full day
+          elapsedMinutes = marketCloseMinutes - marketOpenMinutes;
+          dataPoints = Math.floor(elapsedMinutes / 30) + 1; // 13 points for full day
+        } else {
+          // During market hours - show up to current time
+          dataPoints = Math.max(1, Math.floor(elapsedMinutes / 30) + 1);
         }
-        
-        // If before market hours, show a small amount of pre-market
-        if (currentHourET < marketOpen) {
-          tradingHoursPassed = 2; // Show 2 hours of pre-market
-        }
-        
-        // Ensure at least some data points
-        tradingHoursPassed = Math.max(tradingHoursPassed, 2);
-        
-        // Create appropriate number of data points (2 per hour = 30min intervals)
-        dataPoints = tradingHoursPassed * 2;
-        
-        console.log(`Generating 1D data with ${dataPoints} points (${tradingHoursPassed} hours of trading)`);
-        
-        // Use TODAY's date (not 'date' parameter which might be yesterday)
-        // This ensures intraday data is for today and not yesterday
-        const today = new Date();
-        
+
+        console.log(`Generating 1D data with ${dataPoints} points (current time: ${currentHour}:${currentMinute})`);
+
         dateDelta = (date, i) => {
-          // Start with today's date
-          const newDate = new Date(today);
-          // Set date to today but with specific time
-          newDate.setHours(marketOpen + Math.floor(i / 2));
-          newDate.setMinutes((i % 2) * 30);
-          newDate.setSeconds(0);
-          newDate.setMilliseconds(0);
+          // Create timestamps for each 30-minute interval starting at 9:30 AM
+          const newDate = new Date(date);
+          // Set to today's date
+          newDate.setHours(0, 0, 0, 0);
+          // 9:30 AM = 9 hours + 30 minutes = 570 minutes from midnight
+          // Each interval is 30 minutes
+          const minutesFromMidnight = 570 + (i * 30);
+          const hours = Math.floor(minutesFromMidnight / 60);
+          const minutes = minutesFromMidnight % 60;
+          newDate.setHours(hours, minutes, 0, 0);
           return newDate;
         };
         break;
       case "1W":
-        // Weekly view - moderate changes with more volatility
-        dataPoints = 30;
+        // Weekly view - 7 days of data ending today
+        dataPoints = 7;
         volatility *= 2;
         trend *= 3;
         dateDelta = (date, i) => {
           const newDate = new Date(date);
-          newDate.setDate(date.getDate() - 7 + i);
+          // Start from 7 days ago, end at today
+          newDate.setDate(date.getDate() - (dataPoints - 1 - i));
           return newDate;
         };
         break;
       case "1M":
-        // Monthly view - larger changes, clear trend
+        // Monthly view - 30 days of data ending today
         dataPoints = 30;
         volatility *= 3;
         trend *= 5;
         dateDelta = (date, i) => {
           const newDate = new Date(date);
-          newDate.setDate(date.getDate() - 30 + i);
+          // Start from 30 days ago, end at today
+          newDate.setDate(date.getDate() - (dataPoints - 1 - i));
           return newDate;
         };
         break;
       case "3M":
-        // Quarterly view - significant changes
+        // Quarterly view - 90 days of data ending today (every 2 days)
         dataPoints = 45;
         volatility *= 4;
         trend *= 8;
         dateDelta = (date, i) => {
           const newDate = new Date(date);
-          newDate.setDate(date.getDate() - 90 + (i * 2));
+          // Start from 90 days ago, end at today
+          newDate.setDate(date.getDate() - (90 - (i * 2)));
           return newDate;
         };
         break;
       case "1Y":
-        // Yearly view - major changes
+        // Yearly view - 52 weeks of data ending today
         dataPoints = 52;
         volatility *= 5;
         trend *= 12;
         dateDelta = (date, i) => {
           const newDate = new Date(date);
-          newDate.setDate(date.getDate() - 365 + (i * 7));
+          // Start from 365 days ago, end at today
+          newDate.setDate(date.getDate() - (365 - (i * 7)));
           return newDate;
         };
         break;
       case "5Y":
-        // 5 Year view - dramatic changes
+        // 5 Year view - 60 months of data ending today
         dataPoints = 60;
         volatility *= 7;
         trend *= 20;
         dateDelta = (date, i) => {
           const newDate = new Date(date);
-          newDate.setMonth(date.getMonth() - 60 + i);
+          // Start from 60 months ago, end at today
+          newDate.setMonth(date.getMonth() - (dataPoints - 1 - i));
           return newDate;
         };
         break;
@@ -656,30 +752,53 @@ export class StockApiService {
         dataPoints = 30;
         dateDelta = (date, i) => {
           const newDate = new Date(date);
-          newDate.setDate(date.getDate() - 30 + i);
+          // Start from 30 days ago, end at today
+          newDate.setDate(date.getDate() - (dataPoints - 1 - i));
           return newDate;
         };
     }
     
     // Generate data with appropriate pattern for the timeframe
-    let currentPrice = basePrice * (1 - (trend * dataPoints / 2)); // Start below and trend up
-    
+    // Calculate a reasonable starting price that will trend toward basePrice
+    // Use a much smaller adjustment to prevent negative prices
+    const trendAdjustment = Math.min(0.1, Math.abs(trend * dataPoints * 0.01)); // Cap at 10%
+    let currentPrice = trend >= 0
+      ? basePrice * (1 - trendAdjustment)  // Start lower if trending up
+      : basePrice * (1 + trendAdjustment); // Start higher if trending down
+
     for (let i = 0; i < dataPoints; i++) {
       const date = dateDelta(now, i);
+
+      // Use much smaller volatility to prevent wild swings
+      const scaledVolatility = Math.min(volatility, 0.02); // Cap volatility at 2%
+      const dailyChange = (Math.random() - 0.5) * basePrice * scaledVolatility;
+      const trendComponent = (basePrice * trend) / dataPoints; // Spread trend across all points
+      currentPrice = currentPrice + dailyChange + trendComponent;
+
+      // Ensure price never goes negative or too far from base price
+      currentPrice = Math.max(currentPrice, basePrice * 0.5);
+      currentPrice = Math.min(currentPrice, basePrice * 1.5);
       
-      const dailyChange = (Math.random() - 0.5) * basePrice * volatility;
-      currentPrice = currentPrice + dailyChange + (basePrice * trend);
-      
-      // For 1D view, include time in timestamp
-      const timestamp = timeframe === "1D" 
-        ? date.toISOString().replace('T', ' ').substring(0, 19) // Include time
-        : date.toISOString().split('T')[0]; // Just date for other timeframes
+      // For 1D view, include time in timestamp using local time format
+      let timestamp: string;
+      if (timeframe === "1D") {
+        // Format as local time: "2025-01-25 09:30:00"
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        timestamp = `${year}-${month}-${day} ${hours}:${minutes}:00`;
+      } else {
+        // Just date for other timeframes
+        timestamp = date.toISOString().split('T')[0];
+      }
       
       history.push({
         timestamp,
         close: parseFloat(currentPrice.toFixed(2)),
-        high: parseFloat((currentPrice + (currentPrice * volatility * 0.5)).toFixed(2)),
-        low: parseFloat((currentPrice - (currentPrice * volatility * 0.5)).toFixed(2)),
+        high: parseFloat((currentPrice + (currentPrice * scaledVolatility * 0.5)).toFixed(2)),
+        low: parseFloat((currentPrice - (currentPrice * scaledVolatility * 0.5)).toFixed(2)),
         open: parseFloat((currentPrice - dailyChange).toFixed(2)),
         volume: Math.floor(Math.random() * 10000000) + 30000000,
       });
@@ -937,31 +1056,151 @@ export class StockApiService {
         return this.getMarketIndexInfo(symbol);
       }
       
-      // Fallback company info for AAPL if API fails
-      if (symbol === "AAPL") {
-        return {
+      // Fallback company info for common stocks
+      const fallbackCompanies: Record<string, CompanyInfo> = {
+        "AAPL": {
           symbol: "AAPL",
           name: "Apple Inc.",
           description: "Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide. The company offers iPhone, iPad, Mac, and wearables including AirPods, Apple TV, Apple Watch, and accessories.",
           industry: "Consumer Electronics",
           sector: "Technology",
           ceo: "Tim Cook",
-          employees: 154000,
-          founded: "1980-12-12", // IPO date
+          employees: 164000,
+          founded: "1980-12-12",
           headquarters: "Cupertino, California, USA",
           website: "https://www.apple.com",
           peRatio: 29.47,
           eps: 6.06,
           dividendYield: 0.53,
-          weekRange52: {
-            low: 124.17,
-            high: 198.23,
-          },
+          weekRange52: { low: 164.08, high: 199.62 },
           avgVolume: 58670000,
-        };
+        },
+        "MSFT": {
+          symbol: "MSFT",
+          name: "Microsoft Corporation",
+          description: "Microsoft Corporation develops and supports software, services, devices, and solutions worldwide. The company operates through Productivity and Business Processes, Intelligent Cloud, and More Personal Computing segments.",
+          industry: "Software - Infrastructure",
+          sector: "Technology",
+          ceo: "Satya Nadella",
+          employees: 221000,
+          founded: "1986-03-13",
+          headquarters: "Redmond, Washington, USA",
+          website: "https://www.microsoft.com",
+          peRatio: 35.12,
+          eps: 11.80,
+          dividendYield: 0.72,
+          weekRange52: { low: 309.45, high: 430.82 },
+          avgVolume: 21450000,
+        },
+        "GOOGL": {
+          symbol: "GOOGL",
+          name: "Alphabet Inc.",
+          description: "Alphabet Inc. provides various products and platforms in the United States, Europe, and internationally. It operates through Google Services, Google Cloud, and Other Bets segments. The company offers search, advertising, maps, YouTube, and cloud services.",
+          industry: "Internet Content & Information",
+          sector: "Communication Services",
+          ceo: "Sundar Pichai",
+          employees: 182502,
+          founded: "2004-08-19",
+          headquarters: "Mountain View, California, USA",
+          website: "https://abc.xyz",
+          peRatio: 24.85,
+          eps: 5.80,
+          dividendYield: 0.0,
+          weekRange52: { low: 120.21, high: 191.75 },
+          avgVolume: 24680000,
+        },
+        "AMZN": {
+          symbol: "AMZN",
+          name: "Amazon.com Inc.",
+          description: "Amazon.com, Inc. engages in the retail sale of consumer products and subscriptions through online and physical stores in North America and internationally. It operates through three segments: North America, International, and Amazon Web Services (AWS).",
+          industry: "Internet Retail",
+          sector: "Consumer Cyclical",
+          ceo: "Andy Jassy",
+          employees: 1541000,
+          founded: "1997-05-15",
+          headquarters: "Seattle, Washington, USA",
+          website: "https://www.amazon.com",
+          peRatio: 60.24,
+          eps: 2.90,
+          dividendYield: 0.0,
+          weekRange52: { low: 118.35, high: 201.20 },
+          avgVolume: 47230000,
+        },
+        "NVDA": {
+          symbol: "NVDA",
+          name: "NVIDIA Corporation",
+          description: "NVIDIA Corporation provides graphics, computing and networking solutions in the United States, Taiwan, China, and internationally. The company operates through Graphics and Compute & Networking segments, offering GPUs for gaming, data centers, and AI applications.",
+          industry: "Semiconductors",
+          sector: "Technology",
+          ceo: "Jensen Huang",
+          employees: 29600,
+          founded: "1999-01-22",
+          headquarters: "Santa Clara, California, USA",
+          website: "https://www.nvidia.com",
+          peRatio: 65.32,
+          eps: 1.92,
+          dividendYield: 0.03,
+          weekRange52: { low: 47.32, high: 152.89 },
+          avgVolume: 41250000,
+        },
+        "META": {
+          symbol: "META",
+          name: "Meta Platforms Inc.",
+          description: "Meta Platforms, Inc. engages in the development of products that enable people to connect and share through mobile devices, personal computers, virtual reality headsets, and wearables worldwide. It operates through Family of Apps and Reality Labs segments.",
+          industry: "Internet Content & Information",
+          sector: "Communication Services",
+          ceo: "Mark Zuckerberg",
+          employees: 67317,
+          founded: "2012-05-18",
+          headquarters: "Menlo Park, California, USA",
+          website: "https://about.meta.com",
+          peRatio: 28.45,
+          eps: 14.87,
+          dividendYield: 0.36,
+          weekRange52: { low: 274.38, high: 542.81 },
+          avgVolume: 14850000,
+        },
+        "TSLA": {
+          symbol: "TSLA",
+          name: "Tesla Inc.",
+          description: "Tesla, Inc. designs, develops, manufactures, leases, and sells electric vehicles, and energy generation and storage systems in the United States, China, and internationally. It operates through Automotive and Energy Generation and Storage segments.",
+          industry: "Auto Manufacturers",
+          sector: "Consumer Cyclical",
+          ceo: "Elon Musk",
+          employees: 140473,
+          founded: "2010-06-29",
+          headquarters: "Austin, Texas, USA",
+          website: "https://www.tesla.com",
+          peRatio: 72.15,
+          eps: 3.12,
+          dividendYield: 0.0,
+          weekRange52: { low: 138.80, high: 299.29 },
+          avgVolume: 98450000,
+        },
+      };
+
+      if (fallbackCompanies[symbol]) {
+        return fallbackCompanies[symbol];
       }
-      
-      throw error;
+
+      // Generic fallback for unknown symbols
+      return {
+        symbol: symbol,
+        name: symbol,
+        description: "Company information is currently unavailable. Please try again later.",
+        industry: "N/A",
+        sector: "N/A",
+        ceo: "N/A",
+        employees: 0,
+        founded: "N/A",
+        headquarters: "N/A",
+        website: "",
+        peRatio: 0,
+        eps: 0,
+        dividendYield: 0,
+        weekRange52: { low: 0, high: 0 },
+        avgVolume: 0,
+      };
     }
   }
   
@@ -1126,6 +1365,43 @@ export class StockApiService {
 
   // Get latest news about a stock or general market news
   async getNews(symbol?: string): Promise<NewsItem[]> {
+    // Try Finnhub API first (free tier available)
+    const finnhubKey = process.env.FINNHUB_API_KEY;
+
+    if (finnhubKey) {
+      try {
+        let url: string;
+        if (symbol) {
+          // Company news endpoint
+          const today = new Date();
+          const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+          const fromDate = lastWeek.toISOString().split('T')[0];
+          const toDate = today.toISOString().split('T')[0];
+          url = `https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${fromDate}&to=${toDate}&token=${finnhubKey}`;
+        } else {
+          // General market news
+          url = `https://finnhub.io/api/v1/news?category=general&token=${finnhubKey}`;
+        }
+
+        const response = await axios.get(url);
+        const articles = response.data || [];
+
+        if (articles.length > 0) {
+          return articles.slice(0, 10).map((article: any, index: number) => ({
+            id: String(article.id || index),
+            title: article.headline,
+            summary: article.summary,
+            source: article.source,
+            publishedAt: new Date(article.datetime * 1000).toISOString(),
+            url: article.url,
+          }));
+        }
+      } catch (error) {
+        console.error("Finnhub API error:", error);
+      }
+    }
+
+    // Try Alpha Vantage as fallback
     try {
       let params: any = {
         function: "NEWS_SENTIMENT",
@@ -1138,71 +1414,74 @@ export class StockApiService {
 
       const response = await axios.get(this.baseUrl, { params });
       const articles = response.data.feed || [];
-      
-      // If no articles are returned, throw an error to trigger the fallback
-      if (articles.length === 0) {
-        throw new Error("No news articles available from API");
-      }
 
-      return articles.map((article: any) => ({
-        id: article.id || String(Math.random()),
-        title: article.title,
-        summary: article.summary,
-        source: article.source,
-        publishedAt: article.time_published,
-        url: article.url,
-      })).slice(0, 10); // Limit to 10 news items
+      if (articles.length > 0) {
+        return articles.map((article: any) => ({
+          id: article.id || String(Math.random()),
+          title: article.title,
+          summary: article.summary,
+          source: article.source,
+          publishedAt: article.time_published,
+          url: article.url,
+        })).slice(0, 10);
+      }
     } catch (error) {
-      console.error("Error fetching news:", error);
-      
-      // Enable fallback data for demo purposes
-      
-      // Fallback news if API fails
-      const defaultNews: NewsItem[] = [
+      console.error("Alpha Vantage news error:", error);
+    }
+
+    // Fallback to generated demo news with current timestamps
+    console.log("Using fallback news data");
+    const now = Date.now();
+    const defaultNews: NewsItem[] = [
+      {
+        id: "1",
+        title: "Tech Stocks Rally on Strong Earnings Reports",
+        summary: "Major technology companies reported better-than-expected quarterly results, driving a broad market rally...",
+        source: "MarketWatch",
+        publishedAt: new Date(now - 1800000).toISOString(), // 30 min ago
+        url: "#",
+      },
+      {
+        id: "2",
+        title: "Federal Reserve Maintains Current Interest Rate Policy",
+        summary: "The Federal Reserve kept interest rates unchanged at their latest meeting, signaling a data-dependent approach...",
+        source: "Bloomberg",
+        publishedAt: new Date(now - 3600000).toISOString(), // 1 hour ago
+        url: "#",
+      },
+      {
+        id: "3",
+        title: "AI Investments Continue to Drive Market Momentum",
+        summary: "Companies across sectors are increasing their artificial intelligence investments, boosting related stocks...",
+        source: "CNBC",
+        publishedAt: new Date(now - 7200000).toISOString(), // 2 hours ago
+        url: "#",
+      },
+    ];
+
+    if (symbol) {
+      // Add symbol-specific mock news
+      const symbolNews: NewsItem[] = [
         {
-          id: "1",
-          title: "Apple Announces New M3 MacBook Pro with Improved Performance",
-          summary: "Apple's new M3 chip promises up to 40% faster performance than the previous generation...",
-          source: "Bloomberg",
-          publishedAt: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+          id: "s1",
+          title: `${symbol} Reports Strong Quarter Amid Market Volatility`,
+          summary: `${symbol} exceeded analyst expectations with revenue growth driven by new product launches and expanding market share...`,
+          source: "Reuters",
+          publishedAt: new Date(now - 5400000).toISOString(), // 1.5 hours ago
           url: "#",
         },
         {
-          id: "2",
-          title: "Analysts Raise Apple Price Target After Strong Quarterly Results",
-          summary: "Several Wall Street analysts have raised their price targets for Apple following better-than-expected earnings...",
-          source: "MarketWatch",
-          publishedAt: new Date(Date.now() - 18000000).toISOString(), // 5 hours ago
-          url: "#",
-        },
-        {
-          id: "3",
-          title: "Apple's App Store Faces New Regulatory Challenges in EU",
-          summary: "European regulators announce new requirements that could affect Apple's App Store policies...",
+          id: "s2",
+          title: `Analysts Upgrade ${symbol} on Positive Growth Outlook`,
+          summary: `Several Wall Street firms have raised their price targets following the company's strong performance guidance...`,
           source: "Financial Times",
-          publishedAt: new Date(Date.now() - 86400000).toISOString(), // Yesterday
+          publishedAt: new Date(now - 10800000).toISOString(), // 3 hours ago
           url: "#",
         },
       ];
-      
-      return symbol ? defaultNews : defaultNews.concat([
-        {
-          id: "4",
-          title: "S&P 500 Hits New Record High as Tech Stocks Rally",
-          summary: "The S&P 500 reached a new all-time high today as technology stocks led a broad market rally...",
-          source: "CNBC",
-          publishedAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-          url: "#",
-        },
-        {
-          id: "5",
-          title: "Federal Reserve Signals Potential Rate Cut in Coming Months",
-          summary: "Federal Reserve officials indicated they may be prepared to cut interest rates later this year...",
-          source: "Wall Street Journal",
-          publishedAt: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
-          url: "#",
-        },
-      ]);
+      return [...symbolNews, ...defaultNews].slice(0, 5);
     }
+
+    return defaultNews;
   }
 }

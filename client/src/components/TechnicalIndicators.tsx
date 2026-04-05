@@ -42,22 +42,65 @@ export default function TechnicalIndicators({ symbol }: TechnicalIndicatorsProps
     return "bg-primary";
   };
 
-  // Get overall signal from indicators
+  // Get overall signal from indicators with explanations
   const getSignalSummary = () => {
-    if (!indicators || indicators.length === 0) return { short: "Neutral", medium: "Neutral", long: "Neutral" };
-    
+    if (!indicators || indicators.length === 0) return {
+      short: "Neutral", medium: "Neutral", long: "Neutral",
+      shortReason: "No data available", mediumReason: "No data available", longReason: "No data available"
+    };
+
     // Count positive signals
     const buyCount = indicators.filter(i => i.signal?.includes("Buy")).length;
+    const sellCount = indicators.filter(i => i.signal?.includes("Sell")).length;
     const total = indicators.length;
-    
-    if (buyCount / total > 0.7) {
-      return { short: "Buy", medium: "Buy", long: "Strong Buy" };
-    } else if (buyCount / total > 0.5) {
-      return { short: "Neutral", medium: "Buy", long: "Buy" };
-    } else if (buyCount / total < 0.3) {
-      return { short: "Sell", medium: "Sell", long: "Neutral" };
+    const ratio = buyCount / total;
+
+    // Build context from individual indicators
+    const rsi = indicators.find(i => i.name.includes("RSI"));
+    const macd = indicators.find(i => i.name.includes("MACD"));
+    const sma50 = indicators.find(i => i.name.includes("(50)"));
+    const sma200 = indicators.find(i => i.name.includes("(200)"));
+
+    const rsiNote = rsi
+      ? rsi.value < 30 ? "RSI oversold" : rsi.value > 70 ? "RSI overbought" : "RSI neutral"
+      : "";
+    const macdNote = macd
+      ? macd.signal?.includes("Buy") ? "MACD bullish crossover" : "MACD bearish crossover"
+      : "";
+    const smaNote = sma50 && sma200
+      ? sma50.signal?.includes("Buy") && sma200.signal?.includes("Buy")
+        ? "Price above key moving averages"
+        : "Price below key moving averages"
+      : "";
+
+    if (ratio > 0.7) {
+      return {
+        short: "Buy", medium: "Buy", long: "Strong Buy",
+        shortReason: `${buyCount}/${total} indicators bullish. ${rsiNote}`,
+        mediumReason: `${macdNote}. Momentum favors buyers`,
+        longReason: `${smaNote}. Strong consensus across all indicators`,
+      };
+    } else if (ratio > 0.5) {
+      return {
+        short: "Neutral", medium: "Buy", long: "Buy",
+        shortReason: `Mixed signals short-term. ${rsiNote}`,
+        mediumReason: `${macdNote}. ${buyCount}/${total} indicators lean bullish`,
+        longReason: `${smaNote}. Trend favors gradual upside`,
+      };
+    } else if (ratio < 0.3) {
+      return {
+        short: "Sell", medium: "Sell", long: "Neutral",
+        shortReason: `${sellCount}/${total} indicators bearish. ${rsiNote}`,
+        mediumReason: `${macdNote}. Downward pressure persists`,
+        longReason: `${smaNote}. Long-term trend may stabilize`,
+      };
     } else {
-      return { short: "Neutral", medium: "Neutral", long: "Buy" };
+      return {
+        short: "Neutral", medium: "Neutral", long: "Buy",
+        shortReason: `Signals evenly split. ${rsiNote}`,
+        mediumReason: `${macdNote}. No clear medium-term direction`,
+        longReason: `${smaNote}. Historical trend leans positive`,
+      };
     }
   };
 
@@ -141,17 +184,26 @@ export default function TechnicalIndicators({ symbol }: TechnicalIndicatorsProps
                   <p className={`${getTextColorClass(signalSummary.short)} font-medium`}>
                     {signalSummary.short}
                   </p>
+                  <p className="text-[10px] text-text-secondary mt-1 leading-tight">
+                    {signalSummary.shortReason}
+                  </p>
                 </div>
                 <div className="bg-dark-bg rounded p-2">
                   <p className="text-xs text-text-secondary mb-1">Medium Term</p>
                   <p className={`${getTextColorClass(signalSummary.medium)} font-medium`}>
                     {signalSummary.medium}
                   </p>
+                  <p className="text-[10px] text-text-secondary mt-1 leading-tight">
+                    {signalSummary.mediumReason}
+                  </p>
                 </div>
                 <div className="bg-dark-bg rounded p-2">
                   <p className="text-xs text-text-secondary mb-1">Long Term</p>
                   <p className={`${getTextColorClass(signalSummary.long)} font-medium`}>
                     {signalSummary.long}
+                  </p>
+                  <p className="text-[10px] text-text-secondary mt-1 leading-tight">
+                    {signalSummary.longReason}
                   </p>
                 </div>
               </div>

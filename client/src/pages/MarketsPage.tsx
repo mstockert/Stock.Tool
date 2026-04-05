@@ -14,7 +14,7 @@ import {
 type TimeframeOption = "1D" | "1W" | "1M" | "3M" | "1Y";
 
 export default function MarketsPage() {
-  const [timeframe, setTimeframe] = useState<TimeframeOption>("1D");
+  const [timeframe, setTimeframe] = useState<TimeframeOption>("1Y");
 
   const handleTimeframeChange = (value: string) => {
     setTimeframe(value as TimeframeOption);

@@ -4,3 +4,11 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+.env
+.schwab-tokens.json
+.cache/
+# Local portfolio/trading data
+data.json
+data.json.bak
+*.db
+*.sqlite

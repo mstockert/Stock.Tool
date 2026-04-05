@@ -1,9 +1,19 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect, useMemo } from "react";
+import { useQuery, useQueries } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+} from "recharts";
 import { 
   Dialog, 
   DialogContent, 
@@ -19,6 +29,15 @@ import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+
+type Timeframe = "1D" | "1W" | "1M" | "3M" | "1Y" | "5Y";
+const TIMEFRAMES: Timeframe[] = ["1D", "1W", "1M", "3M", "1Y", "5Y"];
+const LINE_COLORS = [
+  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+  "#ec4899", "#14b8a6", "#f97316", "#06b6d4", "#84cc16",
+];
+
+type HistoryBar = { timestamp: string; close: number };
 
 type Watchlist = {
   id: number;
@@ -201,6 +220,55 @@ export default function WatchlistPage() {
 
   const activeWatchlistData = watchlists?.find(w => w.id.toString() === activeWatchlist);
 
+  const [timeframe, setTimeframe] = useState<Timeframe>("1Y");
+  const chartSymbols = (activeWatchlistData?.symbols || []).map(s => s.symbol);
+
+  const historyQueries = useQueries({
+    queries: chartSymbols.map(sym => ({
+      queryKey: ["/api/stocks/history", sym, timeframe],
+      queryFn: async () => {
+        const res = await fetch(`/api/stocks/history/${sym}?timeframe=${timeframe}`);
+        if (!res.ok) throw new Error(`Failed to fetch history for ${sym}`);
+        return (await res.json()) as HistoryBar[];
+      },
+      staleTime: 60_000,
+    })),
+  });
+
+  const chartLoading = historyQueries.some(q => q.isLoading);
+
+  const chartData = useMemo(() => {
+    if (chartSymbols.length === 0) return [];
+    // Build a map from timestamp -> { timestamp, [SYM]: rebased }
+    const pointMap = new Map<string, Record<string, number | string>>();
+    chartSymbols.forEach((sym, i) => {
+      const bars = historyQueries[i]?.data;
+      if (!bars || bars.length === 0) return;
+      const base = bars[0].close;
+      if (!base || base <= 0) return;
+      bars.forEach(b => {
+        const key = b.timestamp;
+        if (!pointMap.has(key)) pointMap.set(key, { timestamp: key });
+        pointMap.get(key)![sym] = (b.close / base) * 100;
+      });
+    });
+    return Array.from(pointMap.values()).sort((a, b) =>
+      String(a.timestamp).localeCompare(String(b.timestamp))
+    );
+  }, [chartSymbols.join(","), timeframe, historyQueries.map(q => q.dataUpdatedAt).join(",")]);
+
+  const formatXAxis = (ts: string) => {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return ts;
+    if (timeframe === "1D") {
+      return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
+    if (timeframe === "1W" || timeframe === "1M") {
+      return d.toLocaleDateString([], { month: "short", day: "numeric" });
+    }
+    return d.toLocaleDateString([], { month: "short", year: "2-digit" });
+  };
+
   return (
     <>
       <div className="flex justify-between items-center mb-6">
@@ -316,7 +384,79 @@ export default function WatchlistPage() {
           </div>
 
           {watchlists.map((list) => (
-            <TabsContent key={list.id} value={list.id.toString()}>
+            <TabsContent key={list.id} value={list.id.toString()} className="space-y-4">
+              {list.id.toString() === activeWatchlist && list.symbols && list.symbols.length > 0 && (
+                <Card className="bg-dark-surface">
+                  <CardHeader className="px-6 py-4 border-b border-gray-800">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <CardTitle>Performance (rebased to 100)</CardTitle>
+                      <div className="flex gap-1">
+                        {TIMEFRAMES.map(tf => (
+                          <Button
+                            key={tf}
+                            size="sm"
+                            variant={timeframe === tf ? "default" : "outline"}
+                            className="h-7 px-2 text-xs"
+                            onClick={() => setTimeframe(tf)}
+                          >
+                            {tf}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    {chartLoading ? (
+                      <Skeleton className="h-72 w-full" />
+                    ) : chartData.length === 0 ? (
+                      <div className="h-72 flex items-center justify-center text-text-secondary text-sm">
+                        No chart data available
+                      </div>
+                    ) : (
+                      <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                            <XAxis
+                              dataKey="timestamp"
+                              tickFormatter={formatXAxis}
+                              stroke="#94a3b8"
+                              fontSize={11}
+                              minTickGap={40}
+                            />
+                            <YAxis
+                              stroke="#94a3b8"
+                              fontSize={11}
+                              domain={["auto", "auto"]}
+                              tickFormatter={(v) => v.toFixed(0)}
+                            />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #334155" }}
+                              labelFormatter={(l) => formatXAxis(String(l))}
+                              formatter={(value: any, name: any) => [
+                                typeof value === "number" ? `${value.toFixed(2)} (${(value - 100 >= 0 ? "+" : "")}${(value - 100).toFixed(2)}%)` : value,
+                                name,
+                              ]}
+                            />
+                            <Legend wrapperStyle={{ fontSize: 12 }} />
+                            {chartSymbols.map((sym, i) => (
+                              <Line
+                                key={sym}
+                                type="monotone"
+                                dataKey={sym}
+                                stroke={LINE_COLORS[i % LINE_COLORS.length]}
+                                dot={false}
+                                strokeWidth={1.8}
+                                connectNulls
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
               <Card className="bg-dark-surface">
                 <CardHeader className="px-6 py-4 border-b border-gray-800 flex justify-between items-center">
                   <CardTitle>{list.name}</CardTitle>

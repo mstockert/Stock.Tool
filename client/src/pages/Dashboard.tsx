@@ -25,7 +25,7 @@ type TimeframeOption = "1D" | "1W" | "1M" | "3M" | "1Y";
 export default function Dashboard() {
   // Default stock for the dashboard
   const defaultSymbol = "AAPL";
-  const [timeframe, setTimeframe] = useState<TimeframeOption>("1D");
+  const [timeframe, setTimeframe] = useState<TimeframeOption>("1Y");
 
   const handleTimeframeChange = (value: string) => {
     setTimeframe(value as TimeframeOption);

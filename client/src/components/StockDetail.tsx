@@ -16,6 +16,9 @@ type IndicatorState = {
   showSMAShort: boolean;
   showSMAMedium: boolean;
   showSMALong: boolean;
+  showSMA50: boolean;
+  showSMA200: boolean;
+  showTrendMA: boolean;
   showBollinger: boolean;
 };
 
@@ -32,10 +35,13 @@ export default function StockDetail({
 }: StockDetailProps) {
   const [timeframe, setTimeframe] = useState<TimeframeOption>(initialTimeframe);
   const [indicators, setIndicators] = useState<IndicatorState>({
-    showSMAShort: false,
-    showSMAMedium: false,
-    showSMALong: false,
-    showBollinger: false,
+    showSMAShort: true,
+    showSMAMedium: true,
+    showSMALong: true,
+    showSMA50: true,
+    showSMA200: true,
+    showTrendMA: true,
+    showBollinger: true,
   });
 
   // Update timeframe when initialTimeframe prop changes from parent

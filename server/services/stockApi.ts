@@ -1,4 +1,6 @@
 import axios from "axios";
+import * as fs from "fs";
+import * as path from "path";
 import {
   MarketIndex,
   StockQuote,
@@ -9,12 +11,42 @@ import {
   SearchResult,
 } from "@shared/schema";
 import { ibkrApi } from "./ibkrApi";
+import { schwabApi } from "./schwabApi";
+
+/**
+ * Check if US stock markets are currently open (or within a buffer).
+ * Market hours: Mon-Fri, 9:30 AM - 4:00 PM Eastern Time.
+ * We add a 15-min buffer on each side for pre/post market activity.
+ * Returns false on weekends and outside hours.
+ */
+export function isMarketOpen(): boolean {
+  const now = new Date();
+  // Convert to ET (Eastern Time)
+  const et = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const day = et.getDay(); // 0=Sun, 6=Sat
+  if (day === 0 || day === 6) return false;
+
+  const hours = et.getHours();
+  const minutes = et.getMinutes();
+  const timeInMinutes = hours * 60 + minutes;
+
+  // 9:15 AM (pre-market buffer) to 4:15 PM (post-market buffer) ET
+  return timeInMinutes >= 9 * 60 + 15 && timeInMinutes <= 16 * 60 + 15;
+}
 
 // This service handles all external stock API calls
 export class StockApiService {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly ibkrEnabled: boolean;
+  private readonly schwabEnabled: boolean;
+
+  // In-memory quote cache to minimize Alpha Vantage calls (free tier: 25/day).
+  // TTL: 15 min when market is closed, 60 sec when market is open.
+  private readonly quoteCache = new Map<string, { quote: StockQuote; ts: number }>();
+  private quoteCacheTTL(): number {
+    return isMarketOpen() ? 60 * 1000 : 15 * 60 * 1000;
+  }
 
   constructor() {
     // API key would normally come from environment variables
@@ -22,9 +54,13 @@ export class StockApiService {
     this.baseUrl = "https://www.alphavantage.co/query";
     // Check if IBKR is enabled
     this.ibkrEnabled = process.env.IBKR_ENABLED === "true";
+    this.schwabEnabled = process.env.SCHWAB_ENABLED === "true";
 
     if (this.ibkrEnabled) {
       console.log("🔗 Interactive Brokers API enabled - will use real-time data from IB Gateway");
+    }
+    if (this.schwabEnabled) {
+      console.log("🔗 Charles Schwab API enabled - will use as fallback data source");
     }
   }
 
@@ -246,14 +282,32 @@ export class StockApiService {
         return await this.getMarketIndexQuote(symbol);
       }
 
-      // Try IBKR first if enabled
-      if (this.ibkrEnabled) {
+      // Check fresh cache first
+      const cached = this.quoteCache.get(symbol);
+      if (cached && Date.now() - cached.ts < this.quoteCacheTTL()) {
+        return cached.quote;
+      }
+
+      // Try IBKR first if enabled AND market is open (no point querying IBKR when markets are closed)
+      if (this.ibkrEnabled && isMarketOpen()) {
         const ibkrQuote = await ibkrApi.getStockQuote(symbol);
         if (ibkrQuote) {
           console.log(`✅ IBKR quote for ${symbol}: $${ibkrQuote.price}`);
+          this.quoteCache.set(symbol, { quote: ibkrQuote, ts: Date.now() });
           return ibkrQuote;
         }
-        console.log(`⚠️ IBKR quote failed for ${symbol}, falling back to Alpha Vantage`);
+        console.log(`⚠️ IBKR quote failed for ${symbol}, falling back to Schwab/Alpha Vantage`);
+      }
+
+      // Try Schwab next (works outside market hours, generous rate limits)
+      if (this.schwabEnabled) {
+        const schwabQuote = await schwabApi.getStockQuote(symbol);
+        if (schwabQuote) {
+          console.log(`✅ Schwab quote for ${symbol}: $${schwabQuote.price}`);
+          this.quoteCache.set(symbol, { quote: schwabQuote, ts: Date.now() });
+          return schwabQuote;
+        }
+        console.log(`⚠️ Schwab quote failed for ${symbol}, falling back to Alpha Vantage`);
       }
 
       const params = {
@@ -265,11 +319,26 @@ export class StockApiService {
       const response = await axios.get(this.baseUrl, { params });
       const quote = response.data["Global Quote"];
 
+      // Detect Alpha Vantage rate-limit/error payloads — return stale cache if we have one
+      const info = response.data?.Information || response.data?.Note || response.data?.["Error Message"];
+      if (info) {
+        console.warn(`⚠️ Alpha Vantage quote rate-limit/error for ${symbol}: ${info}`);
+        if (cached) {
+          console.log(`↪️ Using stale cached quote for ${symbol} from ${new Date(cached.ts).toISOString()}`);
+          return cached.quote;
+        }
+        throw new Error(`Alpha Vantage: ${info}`);
+      }
+
       if (!quote || !quote["01. symbol"]) {
+        if (cached) {
+          console.log(`↪️ Empty response, using stale cached quote for ${symbol}`);
+          return cached.quote;
+        }
         throw new Error("Quote data not available");
       }
 
-      return {
+      const result: StockQuote = {
         symbol: quote["01. symbol"],
         name: "", // The Global Quote endpoint doesn't return the name
         price: parseFloat(quote["05. price"]),
@@ -282,7 +351,15 @@ export class StockApiService {
         volume: parseInt(quote["06. volume"]),
         marketCap: 0, // Not provided by this endpoint
       };
+      this.quoteCache.set(symbol, { quote: result, ts: Date.now() });
+      return result;
     } catch (error) {
+      // Last-ditch: return stale cached quote if available
+      const cached = this.quoteCache.get(symbol);
+      if (cached) {
+        console.log(`↪️ Exception, using stale cached quote for ${symbol}`);
+        return cached.quote;
+      }
       console.error(`Error fetching quote for ${symbol}:`, error);
       
       // For market indices, use special data if API fails
@@ -389,14 +466,66 @@ export class StockApiService {
         return this.getMarketIndexHistory(symbol, timeframe);
       }
 
-      // Try IBKR first if enabled
-      if (this.ibkrEnabled) {
+      // Minimum date-range span expected (in days) for each timeframe — if IBKR returns a
+      // shorter span, fall through to Alpha Vantage. This catches cases where IBKR returns
+      // lots of bars but all within a limited window (e.g. 1 year of daily bars when we
+      // asked for 5 years).
+      const minDaySpanExpected: Record<string, number> = {
+        "1D": 0,      // intraday
+        "1W": 5,
+        "1M": 20,
+        "3M": 75,
+        "1Y": 300,    // ~10 months
+        "5Y": 1200,   // ~3.3 years minimum for what we call "5Y"
+      };
+
+      const parseIBTimestamp = (ts: string): Date | null => {
+        if (!ts) return null;
+        // IB format: "20241031 15:30:00" or "20241031"
+        const m = ts.match(/^(\d{4})(\d{2})(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/);
+        if (m) {
+          return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4] || "00"}:${m[5] || "00"}:${m[6] || "00"}`);
+        }
+        const d = new Date(ts);
+        return isNaN(d.getTime()) ? null : d;
+      };
+
+      // For long timeframes, skip IBKR entirely — IBKR contracts often only have
+      // limited history (especially paper accounts and ETFs), while Alpha Vantage
+      // TIME_SERIES_WEEKLY returns 20+ years of data for free.
+      const skipIbkrForTimeframe = timeframe === "5Y" || timeframe === "1Y";
+
+      // Try IBKR first if enabled (but not for long timeframes)
+      if (this.ibkrEnabled && !skipIbkrForTimeframe) {
         const ibkrHistory = await ibkrApi.getStockHistory(symbol, timeframe);
         if (ibkrHistory && ibkrHistory.length > 0) {
-          console.log(`✅ IBKR history for ${symbol}: ${ibkrHistory.length} bars`);
-          return ibkrHistory;
+          const first = ibkrHistory[0]?.timestamp;
+          const last = ibkrHistory[ibkrHistory.length - 1]?.timestamp;
+          const firstDate = parseIBTimestamp(first);
+          const lastDate = parseIBTimestamp(last);
+          const daySpan = firstDate && lastDate
+            ? Math.abs(lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)
+            : 0;
+          const minDays = minDaySpanExpected[timeframe] ?? 0;
+
+          if (daySpan >= minDays) {
+            console.log(`✅ IBKR history for ${symbol} (${timeframe}): ${ibkrHistory.length} bars, ${first} → ${last} (${Math.round(daySpan)} days)`);
+            return ibkrHistory;
+          }
+          console.log(`⚠️ IBKR history for ${symbol} (${timeframe}) spans only ${Math.round(daySpan)} days (expected ≥${minDays}), falling back to Alpha Vantage`);
+        } else {
+          console.log(`⚠️ IBKR history failed for ${symbol}, falling back to Schwab/Alpha Vantage`);
         }
-        console.log(`⚠️ IBKR history failed for ${symbol}, falling back to Alpha Vantage`);
+      }
+
+      // Try Schwab as a history fallback (no daily rate limit like Alpha Vantage)
+      if (this.schwabEnabled) {
+        const schwabHistory = await schwabApi.getStockHistory(symbol, timeframe);
+        if (schwabHistory && schwabHistory.length > 0) {
+          console.log(`✅ Schwab history for ${symbol} (${timeframe}): ${schwabHistory.length} bars`);
+          return schwabHistory;
+        }
+        console.log(`⚠️ Schwab history failed for ${symbol}, falling back to Alpha Vantage`);
       }
 
       let params: any = {
@@ -429,34 +558,87 @@ export class StockApiService {
           params.outputsize = "compact";
       }
 
-      const response = await axios.get(this.baseUrl, { params });
-      
-      let timeSeriesKey: string | undefined;
-      if (params.function === "TIME_SERIES_INTRADAY") {
-        timeSeriesKey = `Time Series (${params.interval})`;
-      } else if (params.function === "TIME_SERIES_DAILY") {
-        timeSeriesKey = "Time Series (Daily)";
-      } else if (params.function === "TIME_SERIES_WEEKLY") {
-        timeSeriesKey = "Weekly Time Series";
-      } else if (params.function === "TIME_SERIES_MONTHLY") {
-        timeSeriesKey = "Monthly Time Series";
-      }
+      // On-disk cache — Alpha Vantage free tier is only 25 requests/day, so we
+      // aggressively cache history responses. Daily/weekly/monthly data only
+      // changes once per trading session, so a multi-hour TTL is safe.
+      const cacheDir = path.join(process.cwd(), ".cache", "alphavantage");
+      const cacheKey = `${symbol}_${params.function}_${params.interval || ""}_${params.outputsize || ""}`.replace(/[^A-Za-z0-9_]/g, "");
+      const cachePath = path.join(cacheDir, `${cacheKey}.json`);
+      const cacheTtlMs = params.function === "TIME_SERIES_INTRADAY" ? 5 * 60 * 1000 : 6 * 60 * 60 * 1000;
+      let history: StockHistory[] | null = null;
+      try {
+        const stat = fs.statSync(cachePath);
+        if (Date.now() - stat.mtimeMs < cacheTtlMs) {
+          const cached = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+          if (Array.isArray(cached) && cached.length > 0) {
+            history = cached as StockHistory[];
+          }
+        }
+      } catch { /* cache miss */ }
 
-      const timeSeries = timeSeriesKey ? response.data[timeSeriesKey] : null;
-      
-      if (!timeSeries) {
-        throw new Error("Historical data not available");
-      }
+      if (!history) {
+        const response = await axios.get(this.baseUrl, { params });
 
-      // Convert API response to our schema format
-      const history = Object.entries(timeSeries).map(([timestamp, data]: [string, any]) => ({
-        timestamp,
-        close: parseFloat(data["4. close"]),
-        high: parseFloat(data["2. high"]),
-        low: parseFloat(data["3. low"]),
-        open: parseFloat(data["1. open"]),
-        volume: parseInt(data["5. volume"]),
-      }));
+        // Detect Alpha Vantage rate-limit / error responses. AV returns HTTP 200
+        // with { "Information": "..." } or { "Note": "..." } when rate-limited.
+        if (response.data && (response.data.Information || response.data.Note || response.data["Error Message"])) {
+          const msg = response.data.Information || response.data.Note || response.data["Error Message"];
+          // Fall back to stale cache if we have one
+          try {
+            const cached = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+            if (Array.isArray(cached) && cached.length > 0) {
+              console.log(`⚠️ Alpha Vantage rate-limited for ${symbol}, using stale cache`);
+              history = cached as StockHistory[];
+            }
+          } catch { /* no stale cache */ }
+          if (!history) throw new Error(`Alpha Vantage: ${String(msg).slice(0, 200)}`);
+        }
+
+        if (!history) {
+          let timeSeriesKey: string | undefined;
+          if (params.function === "TIME_SERIES_INTRADAY") {
+            timeSeriesKey = `Time Series (${params.interval})`;
+          } else if (params.function === "TIME_SERIES_DAILY") {
+            timeSeriesKey = "Time Series (Daily)";
+          } else if (params.function === "TIME_SERIES_WEEKLY") {
+            timeSeriesKey = "Weekly Time Series";
+          } else if (params.function === "TIME_SERIES_MONTHLY") {
+            timeSeriesKey = "Monthly Time Series";
+          }
+
+          const timeSeries = timeSeriesKey ? response.data[timeSeriesKey] : null;
+
+          if (!timeSeries) {
+            // Try stale cache before throwing
+            try {
+              const cached = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+              if (Array.isArray(cached) && cached.length > 0) {
+                console.log(`⚠️ Alpha Vantage returned no series for ${symbol}, using stale cache`);
+                history = cached as StockHistory[];
+              }
+            } catch { /* no cache */ }
+            if (!history) throw new Error("Historical data not available");
+          } else {
+            // Convert API response to our schema format
+            history = Object.entries(timeSeries).map(([timestamp, data]: [string, any]) => ({
+              timestamp,
+              close: parseFloat(data["4. close"]),
+              high: parseFloat(data["2. high"]),
+              low: parseFloat(data["3. low"]),
+              open: parseFloat(data["1. open"]),
+              volume: parseInt(data["5. volume"]),
+            }));
+
+            // Persist to disk cache (full, unfiltered series)
+            try {
+              fs.mkdirSync(cacheDir, { recursive: true });
+              fs.writeFileSync(cachePath, JSON.stringify(history));
+            } catch (e) {
+              console.warn(`Failed to write cache for ${symbol}:`, e);
+            }
+          }
+        }
+      }
 
       // Filter based on timeframe
       const now = new Date();
@@ -486,6 +668,7 @@ export class StockApiService {
       }
 
       // Sort from oldest to newest for charts
+      if (!history) throw new Error("Historical data not available");
       return history
         .filter(item => new Date(item.timestamp) >= cutoffDate)
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
@@ -1439,7 +1622,7 @@ export class StockApiService {
         summary: "Major technology companies reported better-than-expected quarterly results, driving a broad market rally...",
         source: "MarketWatch",
         publishedAt: new Date(now - 1800000).toISOString(), // 30 min ago
-        url: "#",
+        url: "https://www.marketwatch.com/markets",
       },
       {
         id: "2",
@@ -1447,7 +1630,7 @@ export class StockApiService {
         summary: "The Federal Reserve kept interest rates unchanged at their latest meeting, signaling a data-dependent approach...",
         source: "Bloomberg",
         publishedAt: new Date(now - 3600000).toISOString(), // 1 hour ago
-        url: "#",
+        url: "https://www.bloomberg.com/markets",
       },
       {
         id: "3",
@@ -1455,7 +1638,7 @@ export class StockApiService {
         summary: "Companies across sectors are increasing their artificial intelligence investments, boosting related stocks...",
         source: "CNBC",
         publishedAt: new Date(now - 7200000).toISOString(), // 2 hours ago
-        url: "#",
+        url: "https://www.cnbc.com/markets/",
       },
     ];
 
@@ -1468,7 +1651,7 @@ export class StockApiService {
           summary: `${symbol} exceeded analyst expectations with revenue growth driven by new product launches and expanding market share...`,
           source: "Reuters",
           publishedAt: new Date(now - 5400000).toISOString(), // 1.5 hours ago
-          url: "#",
+          url: `https://www.google.com/finance/quote/${symbol}`,
         },
         {
           id: "s2",
@@ -1476,7 +1659,7 @@ export class StockApiService {
           summary: `Several Wall Street firms have raised their price targets following the company's strong performance guidance...`,
           source: "Financial Times",
           publishedAt: new Date(now - 10800000).toISOString(), // 3 hours ago
-          url: "#",
+          url: `https://finance.yahoo.com/quote/${symbol}/`,
         },
       ];
       return [...symbolNews, ...defaultNews].slice(0, 5);

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { SearchBar } from "@/components/SearchBar";
 import { cn } from "@/lib/utils";
-import { MenuIcon, LineChart, LayoutDashboard, Star, PieChart, BarChart2, Filter, Calculator, Newspaper, Settings, Bell, Plus, BookOpen } from "lucide-react";
+import { MenuIcon, LineChart, LayoutDashboard, PieChart, BarChart2, Filter, Calculator, Newspaper, Settings, Bell, Plus, BookOpen } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-mobile";
 import { useQuery } from "@tanstack/react-query";
 
@@ -143,20 +143,20 @@ const MainLayout = ({ children }: MainLayoutProps) => {
                 />
               </li>
               <li>
-                <SidebarLink 
-                  icon={<Star className="h-5 w-5" />} 
-                  label="Watchlist" 
-                  href="/watchlists" 
-                  active={location === "/watchlists"} 
+                <SidebarLink
+                  icon={<PieChart className="h-5 w-5" />}
+                  label="Portfolios"
+                  href="/portfolio"
+                  active={location === "/portfolio"}
                   onClick={closeSidebarOnMobile}
                 />
               </li>
               <li>
-                <SidebarLink 
-                  icon={<PieChart className="h-5 w-5" />} 
-                  label="Portfolio" 
-                  href="/portfolio" 
-                  active={location === "/portfolio"} 
+                <SidebarLink
+                  icon={<BarChart2 className="h-5 w-5" />}
+                  label="Portfolio Analysis"
+                  href="/portfolio-analysis"
+                  active={location === "/portfolio-analysis"}
                   onClick={closeSidebarOnMobile}
                 />
               </li>

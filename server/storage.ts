@@ -148,6 +148,20 @@ export class MemStorage implements IStorage {
     if (this.portfolios.size === 0) {
       this.createDefaultPortfolio();
     }
+
+    // Unlink any journal entries that reference a portfolio that no longer
+    // exists (e.g. from a previous delete that didn't cascade).
+    let orphanFix = 0;
+    Array.from(this.tradeJournalEntries.values()).forEach(entry => {
+      if (entry.portfolioId != null && !this.portfolios.has(entry.portfolioId)) {
+        this.tradeJournalEntries.set(entry.id, { ...entry, portfolioId: null });
+        orphanFix++;
+      }
+    });
+    if (orphanFix > 0) {
+      console.log(`[storage] Unlinked ${orphanFix} orphaned journal entries`);
+      this.saveToDisk();
+    }
   }
 
   private createDefaultPortfolio(): void {
@@ -489,6 +503,16 @@ export class MemStorage implements IStorage {
       .map(h => h.id);
 
     holdingsToDelete.forEach(hId => this.portfolioHoldings.delete(hId));
+
+    // Unlink any trade journal entries that referenced this portfolio —
+    // otherwise they become "orphaned" pointing at a deleted id, and show up
+    // under neither a portfolio tab nor the Unassigned tab.
+    Array.from(this.tradeJournalEntries.values()).forEach(entry => {
+      if (entry.portfolioId === id) {
+        this.tradeJournalEntries.set(entry.id, { ...entry, portfolioId: null });
+      }
+    });
+
     this.saveToDisk();
   }
 
@@ -592,4 +616,15 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Try SQLite first, fall back to in-memory storage
+let storageInstance: IStorage;
+try {
+  const { SqliteStorage } = require("./sqliteStorage");
+  storageInstance = new SqliteStorage();
+  console.log("Using SQLite storage (stocktool.db)");
+} catch (e: any) {
+  console.warn("SQLite not available, falling back to in-memory storage:", e.message);
+  storageInstance = new MemStorage();
+}
+
+export const storage = storageInstance;

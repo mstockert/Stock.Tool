@@ -8,6 +8,7 @@ import RiskCalculatorPage from "@/pages/RiskCalculatorPage";
 import NewsFeedPage from "@/pages/NewsFeedPage";
 import ScreenerPage from "@/pages/ScreenerPage";
 import PortfolioPage from "@/pages/PortfolioPage";
+import PortfolioAnalysisPage from "@/pages/PortfolioAnalysisPage";
 import AlertsPage from "@/pages/AlertsPage";
 import JournalPage from "@/pages/JournalPage";
 import SettingsPage from "@/pages/SettingsPage";
@@ -29,6 +30,7 @@ function App() {
           <Route path="/news" component={NewsFeedPage} />
           <Route path="/screener" component={ScreenerPage} />
           <Route path="/portfolio" component={PortfolioPage} />
+          <Route path="/portfolio-analysis" component={PortfolioAnalysisPage} />
           <Route path="/alerts" component={AlertsPage} />
           <Route path="/journal" component={JournalPage} />
           <Route path="/settings" component={SettingsPage} />

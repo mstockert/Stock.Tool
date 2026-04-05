@@ -231,6 +231,7 @@ export type InsertPriceAlert = z.infer<typeof insertPriceAlertSchema>;
 export const tradeJournalEntries = pgTable("trade_journal_entries", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id),
+  portfolioId: integer("portfolio_id").references(() => portfolios.id),
   symbol: text("symbol").notNull(),
   action: text("action").notNull(), // 'buy' or 'sell'
   shares: text("shares").notNull(),
@@ -246,6 +247,7 @@ export const tradeJournalEntries = pgTable("trade_journal_entries", {
 
 export const insertTradeJournalEntrySchema = createInsertSchema(tradeJournalEntries).pick({
   userId: true,
+  portfolioId: true,
   symbol: true,
   action: true,
   shares: true,
